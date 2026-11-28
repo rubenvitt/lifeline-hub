@@ -12,7 +12,10 @@ use serde_json::{json, Value};
 use tower::ServiceExt;
 
 mod common;
-use common::{anfrage, anfrage_json, einsatz_anlegen, login_cookie, setup_mit_pool};
+use common::{
+    anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen,
+    setup_mit_pool,
+};
 
 /// Ein Maschinenzugang der Org des Einsatzes.
 async fn zugang_anlegen(pool: &sqlx::SqlitePool, einsatz: i64) -> String {
@@ -409,4 +412,25 @@ async fn vorschlag_eines_anderen_einsatzes_ist_404() {
     assert!(liste(&app, &admin, e2).await.is_empty());
     assert_eq!(liste(&app, &admin, e1).await.len(), 1);
     assert_eq!(meldungen_im_einsatz(&pool, e2).await, 0);
+}
+
+#[tokio::test]
+async fn mitarbeit_darf_vorschlaege_lesen_aber_nicht_uebernehmen_oder_verwerfen() {
+    // Übernehmen und Verwerfen stehen nicht auf der Positivliste des Erfassens (ADR-0072):
+    // Erfassungsrecht ohne Schreibrecht reicht nicht.
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let id = benutzer_anlegen(&app, &admin, "mitarbeiter", "keine").await;
+    rolle_setzen(&app, &admin, e, id, "mitarbeit").await;
+    let mit = login_cookie(&app, "mitarbeiter", "mitarbeiterpw1").await;
+    let z = zugang_anlegen(&pool, e).await;
+    let vid = vorschlag(&pool, e, &z, "a", "Text").await;
+
+    assert_eq!(liste(&app, &mit, e).await.len(), 1);
+    let (s, v) = uebernehmen(&app, &mit, e, vid, &meldung_koerper("Text", None)).await;
+    assert_eq!(s, StatusCode::FORBIDDEN, "{v}");
+    assert_eq!(verwerfen(&app, &mit, e, vid).await, StatusCode::FORBIDDEN);
+    assert_eq!(meldungen_im_einsatz(&pool, e).await, 0);
+    assert_eq!(liste(&app, &admin, e).await.len(), 1);
 }

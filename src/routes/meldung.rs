@@ -338,10 +338,11 @@ impl GepruefteMeldung {
 /// Alle Prüfungen einer neuen Meldung vor dem Schreiben: Pflichtfelder und Grenzen, Vokabular,
 /// Art für die Rolle, Verortung, Empfängerfunktion, Absenderbezug, Ereigniszeit und
 /// Bestätigungsfrist. Gemeinsam für das Erfassen und die Übernahme eines Vorschlags (LLH-2112),
-/// damit beide denselben Weg gehen. Der Aufrufer hat das Aktiv-Gate schon geprüft.
+/// damit beide denselben Weg gehen. Der Aufrufer hat Gate und Aktiv-Prüfung schon hinter sich;
+/// gelesen werden nur Einsatz, Rolle und Gerät des Kontexts.
 pub(crate) async fn pruefe_neue_meldung(
     state: &AppState,
-    ctx: &EinsatzErfassungsfreigabe<Meldungen>,
+    ctx: &EinsatzKontext,
     req: &NeueMeldung,
 ) -> Result<GepruefteMeldung, AppError> {
     let einsatz_id = ctx.einsatz.id;

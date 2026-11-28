@@ -7,9 +7,13 @@
 //! Prüfungen ([`meldung::pruefe_neue_meldung`]), derselbe Schreibweg
 //! (`meldung::repo::anlegen_mit_client_id_tx`, Auto-ETB nach den Einstellungen), dieselben
 //! Folgen nach dem Commit. Meldung und Vorschlag werden in einer Transaktion geschrieben.
+//!
+//! Übernehmen und Verwerfen stehen nicht auf der Positivliste des Erfassens (ADR-0072): sie
+//! verlangen Schreibrecht (`EinsatzSchreibzugriff`, prüft auch den aktiven Einsatz); die
+//! Mitarbeit liest die Vorschläge nur.
 
 use crate::app::AppState;
-use crate::einsatz::kontext::{EinsatzErfassungsfreigabe, EinsatzKontext, EinsatzLesezugriff};
+use crate::einsatz::kontext::{EinsatzKontext, EinsatzLesezugriff, EinsatzSchreibzugriff};
 use crate::einsatz::modul::Meldungen;
 use crate::error::AppError;
 use crate::extract::{JsonBody, PfadParam};
@@ -101,7 +105,7 @@ pub async fn liste(
 /// die schon angelegte Meldung, auch wenn der Vorschlag inzwischen angenommen ist).
 pub async fn accept(
     State(state): State<AppState>,
-    ctx: EinsatzErfassungsfreigabe<Meldungen>,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     PfadParam((_, vorschlag_id)): PfadParam<(i64, i64)>,
     headers: HeaderMap,
     JsonBody(req): JsonBody<NeueMeldung>,
@@ -114,7 +118,6 @@ pub async fn accept(
             return Ok((StatusCode::CREATED, Json(m)));
         }
     }
-    ctx.fordere_aktiv()?;
     kein_spiegel(&ctx)?;
     let geprueft = meldung::pruefe_neue_meldung(&state, &ctx, &req).await?;
     let daten = geprueft.daten();
@@ -155,11 +158,10 @@ pub async fn accept(
 /// `offen` (sonst 409); einen ETB- oder Audit-Eintrag gibt es nicht.
 pub async fn discard(
     State(state): State<AppState>,
-    ctx: EinsatzErfassungsfreigabe<Meldungen>,
+    ctx: EinsatzSchreibzugriff<Meldungen>,
     PfadParam((_, vorschlag_id)): PfadParam<(i64, i64)>,
 ) -> Result<StatusCode, AppError> {
     kein_geraet(&ctx)?;
-    ctx.fordere_aktiv()?;
     kein_spiegel(&ctx)?;
     let einsatz_id = ctx.einsatz.id;
     let benutzer_id = ctx.benutzer.id;
