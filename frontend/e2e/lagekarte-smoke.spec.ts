@@ -227,10 +227,10 @@ function schneiden(
 
 // LLH-2122: das Livebild der Drohne (LLH-2107) am Handschirm 390 × 844. Das Fenster steht über
 // der Kartenspalte; es darf weder den Kartenfuß (Maßstab, „Stand sichern“) noch die Kartenknöpfe
-// verdecken und muss ganz im Bild stehen, das Kreuz bedienbar. Den linken Block prüft der Fall
-// erst nach LLH-2137. Drohnenquelle,
+// verdecken, auch den linken Block nicht (LLH-2137), und muss ganz im Bild stehen, das Kreuz
+// bedienbar. Drohnenquelle,
 // Lage und Video simuliert `e2e/drohne-kern.ts`; die Zuschaltung geht über den Server.
-test('Lagekarte: Livebild der Drohne bei 390 px verdeckt weder Fuß noch Kartenknöpfe', async ({
+test('Lagekarte: Livebild der Drohne bei 390 px verdeckt weder linken Block noch Fuß noch Kartenknöpfe', async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -288,9 +288,13 @@ test('Lagekarte: Livebild der Drohne bei 390 px verdeckt weder Fuß noch Kartenk
     }
   };
   await pruefe(page.locator('[data-lfh="karten-fuss"] > *'), 'den Kartenfuß');
-  // Den linken Block überdeckt das Fenster bei 390 px noch (≈ 10 px über der Zeigerkoordinate):
-  // LLH-2137. Mit dem Fix diese Prüfung einschalten.
-  // await pruefe(page.locator('[data-lfh="karten-ueberlagerung-links"] > *'), 'den linken Block');
+  // Das Fenster steht selbst im linken Block (LLH-2137): geprüft werden die übrigen Kinder.
+  await pruefe(
+    page.locator(
+      `[data-lfh="karten-ueberlagerung-links"] > :not([data-lfh="drohnen-video-fenster"])`,
+    ),
+    'den linken Block',
+  );
   await pruefe(page.locator('[data-lfh="karten-knoepfe"]'), 'die Kartenknöpfe');
 
   // Das Kreuz ist bedienbar (Klick, nicht nur sichtbar).

@@ -3,8 +3,9 @@ import { useRef } from 'react';
 import { useDrohnenQuellen } from '../../api/drohne';
 import { IconKreuz } from '../../icons';
 import { Paneel, Textstufe, useRollen } from '../../components/instrument';
-import { UEBERLAGERUNG_RAND, kartenKnopfBreite } from './KartenUeberlagerung';
+import { UEBERLAGERUNG_RAND } from './KartenUeberlagerung';
 import { useHlsWiedergabe } from './useHlsWiedergabe';
+import { useLivebildMaxBreite } from './livebildPlatz';
 
 export { livebildUrl, wiederholNachMs } from './useHlsWiedergabe';
 
@@ -30,32 +31,34 @@ export interface DrohnenVideoFensterProps {
  * scheitert das, startet das Fenster mit Pause neu ([`wiederholNachMs`]), solange die Quelle den
  * Schlüssel meldet (verschwindet er, ist `videoKey` `null` und der Versuch entfällt).
  *
- * Eigener Block der Karte (Muster `KartenUeberlagerung`): einzeln positioniert, kein Rahmen über der
- * Karte, sonst schluckte er jedes Ziehen. Die Breite folgt der Kartenspalte (bis zur Knopfspalte,
- * höchstens `28rem`), keine feste Breite.
+ * Steht als letztes Element im linken Block der Karte (`KartenUeberlagerung`, Prop `livebild`),
+ * unter der Zeigerkoordinate: so liegt es nie über dem Block, wie hoch er auch ist (LLH-2137). Der
+ * Block reicht Tipps durch, das Fenster holt sie sich zurück. Die Breite folgt der Kartenspalte
+ * (bis zur Knopfspalte, höchstens `28rem`) und gibt nach, bis das Bild über dem Kartenfuß endet
+ * (`livebildPlatz.ts`): das Bild bleibt 16 : 9 und wird schmaler, statt beschnitten zu werden.
  */
 export default function DrohnenVideoFenster({
   einsatzId,
   videoKey,
   onClose,
 }: DrohnenVideoFensterProps) {
-  const { token, rollen } = useRollen();
+  const { rollen } = useRollen();
   const videoRef = useRef<HTMLVideoElement>(null);
+  const fensterRef = useRef<HTMLDivElement>(null);
+  const bildRef = useRef<HTMLDivElement>(null);
   const zustand = useHlsWiedergabe(einsatzId, videoKey, videoRef);
+  const maxBreite = useLivebildMaxBreite(fensterRef, bildRef, UEBERLAGERUNG_RAND);
 
   const kein = zustand === 'kein';
   return (
     <div
+      ref={fensterRef}
       data-lfh={DROHNEN_VIDEO_FENSTER}
       style={{
-        position: 'absolute',
-        left: UEBERLAGERUNG_RAND,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        zIndex: 6,
-        // Bis vor die Knopfspalte, nie breiter als nötig; folgt der Kartenspalte (390 px bis Desktop).
-        width: `calc(100% - ${kartenKnopfBreite(token) + 3 * UEBERLAGERUNG_RAND}px)`,
-        maxWidth: '28rem',
+        // Der Block endet vor der Knopfspalte (`maxWidth`), das Fenster an ihm.
+        width: '28rem',
+        maxWidth: maxBreite == null ? '100%' : `min(100%, ${maxBreite}px)`,
+        pointerEvents: 'auto',
       }}
     >
       <Paneel
@@ -73,7 +76,10 @@ export default function DrohnenVideoFenster({
           />
         }
       >
-        <div style={{ position: 'relative', aspectRatio: '16 / 9', background: rollen.grund }}>
+        <div
+          ref={bildRef}
+          style={{ position: 'relative', aspectRatio: '16 / 9', background: rollen.grund }}
+        >
           <video
             ref={videoRef}
             muted
