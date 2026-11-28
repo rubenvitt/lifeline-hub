@@ -3808,6 +3808,7 @@ pub const TABELLEN: &[TabellenRegel] = &[
             retain("zugestellt_at", G_ZEIT),
             retain("naechste_abfrage_at", G_ZEIT),
             retain("ohne_pdf", G_ENUM),
+            retain("anlagen_offen", G_ZAEHLER),
         ],
     },
     // Gesendete Teile eines Versands (LLH-2094): Teilnummer und Event-ID des Homeservers sind

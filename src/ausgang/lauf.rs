@@ -184,11 +184,13 @@ async fn schliesse_unterbrochen(pool: &SqlitePool, live: &LiveHub, zeile: &Versa
         let ergebnis = Ergebnis::Fehlgeschlagen {
             fehler: AusgangFehler::Ungewiss,
             status: None,
+            anlagen_offen: None,
         };
         if is_spiegel(pool, zeile.einsatz_id).await? {
             let spiegel = Ergebnis::Fehlgeschlagen {
                 fehler: AusgangFehler::Spiegel,
                 status: None,
+                anlagen_offen: None,
             };
             return abschliessen(pool, live, zeile, begonnen, spiegel, None, &[]).await;
         }
@@ -384,6 +386,7 @@ async fn run_one(
     let fehlgeschlagen = |fehler| Ergebnis::Fehlgeschlagen {
         fehler,
         status: None,
+        anlagen_offen: None,
     };
 
     // Ein Spiegel nimmt kein ETB an: sichtbar fehlgeschlagen, ohne Eintrag.
@@ -609,6 +612,7 @@ async fn run_one(
 
     // Das Netz, ohne Datenbankverbindung.
     let antwort = zusteller.mail.zustellen(&auftrag).await;
+    let anlagen = anhaenge.len();
     drop(anhaenge);
     drop(pdf);
     let t = jetzt();
@@ -625,7 +629,8 @@ async fn run_one(
             &z.teile,
         ),
         Err(f) => {
-            let (e, text) = nach_fehler(&zeile, f, erster, versuche, t);
+            let teilweise = anlagen_offen(anlagen, &gesendet, &f.teile);
+            let (e, text) = nach_fehler(&zeile, f, erster, versuche, t, teilweise);
             (e, text, &f.teile)
         }
     };
@@ -731,7 +736,11 @@ fn nach_fax_fehler(
     let status = e.status();
     let endgueltig = |fehler| {
         (
-            Ergebnis::Fehlgeschlagen { fehler, status },
+            Ergebnis::Fehlgeschlagen {
+                fehler,
+                status,
+                anlagen_offen: None,
+            },
             Some(etb_text_fax(zeile, fehler, Some(e))),
         )
     };
@@ -763,18 +772,28 @@ fn nach_fax_fehler(
 /// Ordnet einen Fehlschlag der Zustellung zu, für jeden Kanal an dieser einen Stelle:
 /// vorübergehend wird im Fenster wiederholt (ohne ETB, frühestens zu `nicht_vor`), alles andere
 /// ist endgültig und steht im ETB mit dem Grund des Zustellers.
+///
+/// `teilweise` ist die Zahl der Anlagen, die nach gesendetem Text fehlen ([`anlagen_offen`]); ein
+/// endgültiger Fehlschlag merkt sie sich und nennt die Teilzustellung im ETB (LLH-2146).
 fn nach_fehler(
     zeile: &VersandZeile,
     f: &Fehlschlag,
     erster: DateTime<Utc>,
     versuche: i64,
     jetzt: DateTime<Utc>,
+    teilweise: Option<i64>,
 ) -> (Ergebnis, Option<String>) {
     let status = f.smtp_status;
     let endgueltig = |fehler| {
+        // „unklar“ ist keine Teilzustellung mit Grund, sondern eine offene Frage.
+        let anlagen_offen = teilweise.filter(|_| fehler != AusgangFehler::Ungewiss);
         (
-            Ergebnis::Fehlgeschlagen { fehler, status },
-            Some(etb_text(zeile, fehler, Some(&f.grund))),
+            Ergebnis::Fehlgeschlagen {
+                fehler,
+                status,
+                anlagen_offen,
+            },
+            Some(etb_text_teilweise(zeile, fehler, &f.grund, anlagen_offen)),
         )
     };
     match f.fehler {
@@ -851,6 +870,30 @@ fn etb_text_fax(zeile: &VersandZeile, fehler: AusgangFehler, fax: Option<Sipgate
 }
 
 fn etb_text_mit(zeile: &VersandZeile, fehler: AusgangFehler, grund: &str) -> String {
+    etb_text_teilweise(zeile, fehler, grund, None)
+}
+
+/// Wie viele Anlagen eines Versands nicht hinausgingen, obwohl der Text (Teil 0) es tat (LLH-2146):
+/// `anlagen` ist ihre Zahl (Teile 1…`anlagen`), `gesendet` die früher gemerkten, `neu` die in
+/// diesem Versuch gesendeten Teile. `None` ohne Text oder wenn nichts fehlt.
+fn anlagen_offen(anlagen: usize, gesendet: &[i64], neu: &[(i64, String)]) -> Option<i64> {
+    let ging = |teil: i64| gesendet.contains(&teil) || neu.iter().any(|(t, _)| *t == teil);
+    if !ging(0) {
+        return None;
+    }
+    let offen = (1..=anlagen as i64).filter(|t| !ging(*t)).count() as i64;
+    (offen > 0).then_some(offen)
+}
+
+/// Der ETB-Text eines endgültigen Fehlschlags; `teilweise` (Zahl der nicht gesendeten Anlagen
+/// nach gesendetem Text) macht aus „nicht zugestellt“ „teilweise zugestellt (Text ja, n Anlagen
+/// nein)“. Die übrigen Formen („unklar“, „nicht gesendet“) bleiben.
+fn etb_text_teilweise(
+    zeile: &VersandZeile,
+    fehler: AusgangFehler,
+    grund: &str,
+    teilweise: Option<i64>,
+) -> String {
     let ziel = ziel_text(zeile);
     match fehler {
         AusgangFehler::Ueberholt => {
@@ -868,7 +911,13 @@ fn etb_text_mit(zeile: &VersandZeile, fehler: AusgangFehler, grund: &str) -> Str
         AusgangFehler::Ungewiss => {
             format!("{ziel}: Zustellung unklar, Verbindung nach dem Senden abgebrochen")
         }
-        _ => format!("{ziel} nicht zugestellt: {grund}"),
+        _ => match teilweise {
+            Some(n) => {
+                let anlagen = if n == 1 { "Anlage" } else { "Anlagen" };
+                format!("{ziel} teilweise zugestellt (Text ja, {n} {anlagen} nein): {grund}")
+            }
+            None => format!("{ziel} nicht zugestellt: {grund}"),
+        },
     }
 }
 
@@ -1132,6 +1181,47 @@ mod tests {
     }
 
     #[test]
+    fn anlagen_offen_nur_wenn_der_text_ging() {
+        let t = |n: i64| (n, format!("$e{n}"));
+        assert_eq!(anlagen_offen(2, &[], &[t(0)]), Some(2));
+        assert_eq!(anlagen_offen(2, &[0], &[t(1)]), Some(1));
+        assert_eq!(anlagen_offen(2, &[0], &[]), Some(2));
+        assert_eq!(anlagen_offen(2, &[], &[t(1)]), None);
+        assert_eq!(anlagen_offen(0, &[0], &[]), None);
+        assert_eq!(anlagen_offen(2, &[0, 1, 2], &[]), None);
+        assert_eq!(anlagen_offen(2, &[], &[]), None);
+    }
+
+    #[test]
+    fn etb_text_nennt_teilzustellung_mit_der_zahl_der_anlagen() {
+        let mut z = zeile(
+            QuelleArt::Lagebericht,
+            "Lagebericht Nr. 3 – Hochwasser – Stand 021000jun26",
+        );
+        z.kanal = crate::externe_stelle::KanalArt::Matrix;
+        z.adresse = "#lage:example.org".into();
+        let grund = "Homeserver nicht erreichbar";
+        assert_eq!(
+            etb_text_teilweise(&z, AusgangFehler::Voruebergehend, grund, Some(2)),
+            "Lagebericht Nr. 3 per Matrix an Leitstelle Nord (#lage:example.org) teilweise \
+             zugestellt (Text ja, 2 Anlagen nein): Homeserver nicht erreichbar"
+        );
+        assert!(
+            etb_text_teilweise(&z, AusgangFehler::Abgelehnt, grund, Some(1)).ends_with(
+                "teilweise zugestellt (Text ja, 1 Anlage nein): Homeserver nicht erreichbar"
+            )
+        );
+        assert!(
+            etb_text_teilweise(&z, AusgangFehler::Abgelehnt, grund, None)
+                .ends_with("nicht zugestellt: Homeserver nicht erreichbar")
+        );
+        // „unklar“ behält seinen Wortlaut.
+        let unklar = etb_text_teilweise(&z, AusgangFehler::Ungewiss, grund, Some(1));
+        assert!(unklar.contains("Zustellung unklar"), "{unklar}");
+        assert!(!unklar.contains("teilweise"), "{unklar}");
+    }
+
+    #[test]
     fn etb_text_nennt_quelle_stelle_und_adresse() {
         let z = zeile(
             QuelleArt::Lagebericht,
@@ -1168,11 +1258,11 @@ mod tests {
             SmtpFehler::Zeitueberschreitung,
             SmtpFehler::Dns,
         ] {
-            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0);
+            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0, None);
             assert!(matches!(ergebnis, Ergebnis::Wiederholen { .. }), "{e:?}");
             assert!(text.is_none());
             let spaet = t0 + chrono::Duration::minutes(31);
-            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 2, spaet);
+            let (ergebnis, text) = nach_fehler(&z, &smtp_fehlschlag(e), t0, 2, spaet, None);
             assert!(
                 matches!(
                     ergebnis,
@@ -1185,7 +1275,7 @@ mod tests {
             );
             assert!(text.is_some());
         }
-        let fall = |e| match nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0).0 {
+        let fall = |e| match nach_fehler(&z, &smtp_fehlschlag(e), t0, 1, t0, None).0 {
             Ergebnis::Fehlgeschlagen { fehler, .. } => fehler,
             other => panic!("{other:?}"),
         };

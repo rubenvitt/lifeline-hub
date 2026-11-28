@@ -24700,6 +24700,14 @@
           "agency_name": {
             "type": "string"
           },
+          "attachments_missing": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Teilzustellung (Matrix, LLH-2146): der Text ging hinaus, so viele Anlagen nicht; nur bei\n`fehlgeschlagen`."
+          },
           "attempts": {
             "type": "integer",
             "format": "int64"

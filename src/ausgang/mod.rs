@@ -46,6 +46,10 @@ pub struct Versand {
     pub delivered_at: Option<String>,
     /// Die Mail ging ohne PDF hinaus, weil das PDF zu groß oder nicht erzeugbar war.
     pub without_pdf: bool,
+    /// Teilzustellung (Matrix, LLH-2146): der Text ging hinaus, so viele Anlagen nicht; nur bei
+    /// `fehlgeschlagen`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub attachments_missing: Option<i64>,
 }
 
 /// Eine Zeile von `ausgang` mit allem, was der Lauf braucht (intern, nie auf dem Wire).

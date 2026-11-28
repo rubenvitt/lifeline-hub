@@ -21,7 +21,7 @@ const ZEILE: &str = "id, org_id, einsatz_id, client_id, quelle_art, quelle_id, k
 const ANZEIGE: &str = "a.id, a.quelle_art, a.quelle_id, a.kanal, a.externe_stelle_id, \
      a.stelle_bezeichnung, a.adresse, a.betreff, a.zustand, a.fehler_art, a.fehler_status, \
      a.versuche, a.erstellt_von_id, b.anzeigename AS erstellt_von_name, a.erstellt_at, \
-     a.uebergeben_at, a.zugestellt_at, a.ohne_pdf";
+     a.uebergeben_at, a.zugestellt_at, a.ohne_pdf, a.anlagen_offen";
 
 #[derive(sqlx::FromRow)]
 struct AnzeigeZeile {
@@ -44,6 +44,7 @@ struct AnzeigeZeile {
     uebergeben_at: Option<String>,
     zugestellt_at: Option<String>,
     ohne_pdf: bool,
+    anlagen_offen: Option<i64>,
 }
 
 impl From<AnzeigeZeile> for Versand {
@@ -67,6 +68,7 @@ impl From<AnzeigeZeile> for Versand {
             handed_over_at: z.uebergeben_at,
             delivered_at: z.zugestellt_at,
             without_pdf: z.ohne_pdf,
+            attachments_missing: z.anlagen_offen,
         }
     }
 }
@@ -88,10 +90,12 @@ pub enum Ergebnis {
         fehler: AusgangFehler,
         status: Option<u16>,
     },
-    /// Endgültig `fehlgeschlagen`, ohne weitere Wiederholung.
+    /// Endgültig `fehlgeschlagen`, ohne weitere Wiederholung. `anlagen_offen`: der Text ging
+    /// hinaus, so viele Anlagen nicht (Matrix, LLH-2146).
     Fehlgeschlagen {
         fehler: AusgangFehler,
         status: Option<u16>,
+        anlagen_offen: Option<i64>,
     },
 }
 
@@ -245,7 +249,8 @@ pub async fn retry_tx(
         "UPDATE ausgang SET zustand = 'wartet', versuche = 0, erster_versuch_at = ?, \
              naechster_versuch_at = ?, versuch_begonnen_at = NULL, fehler_art = NULL, \
              fehler_status = NULL, uebergeben_at = NULL, anbieter_ref = NULL, \
-             zugestellt_at = NULL, naechste_abfrage_at = NULL, ohne_pdf = 0 \
+             zugestellt_at = NULL, naechste_abfrage_at = NULL, ohne_pdf = 0, \
+             anlagen_offen = NULL \
          WHERE id = ? AND einsatz_id = ? AND zustand = 'fehlgeschlagen'",
     )
     .bind(&t)
@@ -401,7 +406,8 @@ pub async fn save_ergebnis_tx(
             sqlx::query(sqlx::AssertSqlSafe(format!(
                 "UPDATE ausgang SET zustand = 'uebergeben', uebergeben_at = ?, \
                  naechster_versuch_at = NULL, versuch_begonnen_at = NULL, fehler_art = NULL, \
-                 fehler_status = NULL, anbieter_ref = ?, naechste_abfrage_at = ?, ohne_pdf = ? \
+                 fehler_status = NULL, anbieter_ref = ?, naechste_abfrage_at = ?, ohne_pdf = ?, \
+                 anlagen_offen = NULL \
                  {BEDINGUNG}"
             )))
             .bind(zeit(at))
@@ -420,12 +426,18 @@ pub async fn save_ergebnis_tx(
         .bind(zeit(naechster))
         .bind(fehler.as_str())
         .bind(status.map(i64::from)),
-        Ergebnis::Fehlgeschlagen { fehler, status } => sqlx::query(sqlx::AssertSqlSafe(format!(
+        Ergebnis::Fehlgeschlagen {
+            fehler,
+            status,
+            anlagen_offen,
+        } => sqlx::query(sqlx::AssertSqlSafe(format!(
             "UPDATE ausgang SET zustand = 'fehlgeschlagen', naechster_versuch_at = NULL, \
-                 versuch_begonnen_at = NULL, fehler_art = ?, fehler_status = ? {BEDINGUNG}"
+                 versuch_begonnen_at = NULL, fehler_art = ?, fehler_status = ?, \
+                 anlagen_offen = ? {BEDINGUNG}"
         )))
         .bind(fehler.as_str())
-        .bind(status.map(i64::from)),
+        .bind(status.map(i64::from))
+        .bind(anlagen_offen),
     };
     let n = q
         .bind(id)

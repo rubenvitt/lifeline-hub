@@ -105,8 +105,9 @@ Für Einsatzleitung und Führungspersonal, mit freigegebenem Bericht:
 
 3. „Senden“ wählen. Unter dem Berichtstext erscheint der Abschnitt „Versand“ mit einer Zeile je
    Adresse, ihrem Weg und ihrem Stand: „wartet“, „übergeben 14:32“, beim Fax „übergeben 14:32,
-   Zustellung wird geprüft“ und danach „zugestellt 14:34“, oder „fehlgeschlagen: …“. Ein
-   Matrix-Raum steht dort mit seinem Alias, eine Raum-ID gekürzt.
+   Zustellung wird geprüft“ und danach „zugestellt 14:34“, oder „fehlgeschlagen: …“. Kam in
+   einem Matrix-Raum der Text an, aber nicht jede Anlage, steht dort „teilweise zugestellt (Text
+   ja, 2 Anlagen nein): …“. Ein Matrix-Raum steht dort mit seinem Alias, eine Raum-ID gekürzt.
 4. Ist ein Versand fehlgeschlagen oder die Zustellung unklar, in seiner Zeile „Erneut senden“
    wählen.
 
@@ -231,7 +232,10 @@ Anbindung der Organisation: einen Mailserver bzw. ein Matrix-Konto (Kapitel
   wiederholten Teil und legt ihn nicht doppelt ab. Ist der Raum verschlüsselt, geht die Nachricht
   verschlüsselt hinaus, nie im Klartext; geht das nicht, steht der Versand als „fehlgeschlagen:
   Verschlüsseln nicht möglich“ da. Das Matrix-Konto tritt einem Raum bei, wenn es eingeladen ist
-  oder der Raum öffentlich ist; sonst „fehlgeschlagen: Kein Zutritt zum Raum“.
+  oder der Raum öffentlich ist; sonst „fehlgeschlagen: Kein Zutritt zum Raum“. Scheitert nach dem
+  Text eine Anlage endgültig, steht der Versand als „teilweise zugestellt (Text ja, n Anlagen
+  nein)“ da, im ETB ebenso: Die Stelle hat den Text, es fehlen n Bilder. „Erneut senden“ schickt
+  nur die fehlenden Anlagen nach.
 - **Einsatztagebuch.** Jedes Ergebnis steht im ETB, etwa „Lagebericht Nr. 3 per E-Mail an Leitstelle
   Nord (lagedienst@…) übergeben“ oder „… per Matrix an Leitstelle Nord (#lage:…) übergeben“; ein Wiederholungsversuch im Fenster schreibt nichts. Ein Versand
   ist nie halb: er ist übergeben und im ETB, oder er steht sichtbar als fehlgeschlagen da.
