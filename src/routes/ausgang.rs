@@ -326,7 +326,6 @@ async fn anlegen(
                     stelle.bezeichnung
                 )));
             }
-            // Threema nimmt noch kein Versand an, auch wenn die Tabelle es kennt.
             if !kanal.channel.is_freigeschaltet() {
                 return Err(AppError::UnprocessableEntity(
                     "Dieser Kanal wird noch nicht unterstützt".into(),

@@ -36,8 +36,7 @@ wire_enum! {
 
 wire_enum! {
     /// Kanal, über den eine externe Stelle erreichbar ist (LLH-2093). Alle vier stehen im CHECK der
-    /// Tabelle `org_externe_stelle_kanal`, damit die Nachzüge keinen Tabellenumbau brauchen;
-    /// angenommen werden heute E-Mail, Fax und Matrix (siehe [`KanalArt::is_freigeschaltet`]).
+    /// Tabelle `org_externe_stelle_kanal`; seit LLH-2096 nehmen API und Oberfläche alle vier an.
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
     pub enum KanalArt {
         Email => "email",
@@ -49,19 +48,20 @@ wire_enum! {
 }
 
 impl KanalArt {
-    /// Ob API und Oberfläche den Kanal annehmen: E-Mail, Fax (LLH-2095) und Matrix (LLH-2094).
+    /// Ob API und Oberfläche den Kanal annehmen: E-Mail, Fax (LLH-2095), Matrix (LLH-2094) und
+    /// Threema (LLH-2096).
     pub fn is_freigeschaltet(self) -> bool {
-        matches!(self, KanalArt::Email | KanalArt::Fax | KanalArt::Matrix)
+        true
     }
 
     /// Code der Adapter-Art, über die der Ausgangskorb diesen Kanal zustellt (Spec Matrix,
-    /// Abschnitt 6, „Zugang je Kanal“); Threema hat noch keine.
+    /// Abschnitt 6, „Zugang je Kanal“).
     pub fn adapter_art(self) -> Option<&'static str> {
         match self {
             KanalArt::Email => Some(crate::adapter::smtp_art::CODE),
             KanalArt::Fax => Some(crate::adapter::sipgate_fax_art::CODE),
             KanalArt::Matrix => Some(crate::adapter::matrix_art::CODE),
-            KanalArt::Threema => None,
+            KanalArt::Threema => Some("threema"),
         }
     }
 }

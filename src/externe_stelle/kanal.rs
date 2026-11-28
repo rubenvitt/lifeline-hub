@@ -1,6 +1,5 @@
-//! Kanaladressen einer externen Stelle (LLH-2093, Spec `ausgang-email` Abschnitt 1). Heute nimmt
-//! die Oberfläche E-Mail, Fax (LLH-2095) und Matrix (LLH-2094) an ([`KanalArt::is_freigeschaltet`]); die Tabelle kennt schon alle
-//! vier Kanäle. Org-Isolation wie im Repo der Stelle: eine fremde Stelle oder Adresse ist
+//! Kanaladressen einer externen Stelle (LLH-2093, Spec `ausgang-email` Abschnitt 1). Die Oberfläche
+//! nimmt alle vier Kanäle an: E-Mail, Fax (LLH-2095), Matrix (LLH-2094) und Threema (LLH-2096). Org-Isolation wie im Repo der Stelle: eine fremde Stelle oder Adresse ist
 //! `NotFound`.
 
 use super::repo::load_conn;
@@ -126,6 +125,29 @@ pub fn normalize_matrix(roh: &str) -> Result<String, String> {
             .to_string()
     })?;
     Ok(id.to_string())
+}
+
+/// Prüft eine Threema-ID (LLH-2096) und bringt sie in Speicherform: aller Leerraum entfernt
+/// (`ECHO ECHO` ist ein üblicher Tippstil), in Großbuchstaben, genau acht Zeichen aus `A–Z` und
+/// `0–9`; das erste darf `*` sein (Gateway-IDs). Ob es die ID gibt, zeigt erst der Versand. Der
+/// Fehlertext ist für die Oberfläche bestimmt.
+pub fn normalize_threema(roh: &str) -> Result<String, String> {
+    let id: String = roh
+        .chars()
+        .filter(|c| !c.is_whitespace())
+        .map(|c| c.to_ascii_uppercase())
+        .collect();
+    if id.is_empty() {
+        return Err("Threema-ID darf nicht leer sein".into());
+    }
+    let gueltig = id.len() == 8
+        && id.chars().enumerate().all(|(i, c)| {
+            c.is_ascii_uppercase() || c.is_ascii_digit() || (i == 0 && c == '*')
+        });
+    if !gueltig {
+        return Err("Eine Threema-ID hat acht Zeichen (Buchstaben und Ziffern)".into());
+    }
+    Ok(id)
 }
 
 /// Teil-Patch einer Adresse (Tri-State): `label: Some(None)` leert die Bezeichnung.

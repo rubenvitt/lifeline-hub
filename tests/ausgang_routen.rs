@@ -522,8 +522,8 @@ async fn fremde_kanaladresse_404() {
 }
 
 #[tokio::test]
-async fn threema_adresse_ist_422_nicht_unterstuetzt() {
-    // Fax (LLH-2095) und Matrix (LLH-2094) gehen; Threema hat noch keinen Weg.
+async fn threema_versand_ohne_threema_anbindung_ist_422_anbindung_fehlt() {
+    // Seit LLH-2096 nimmt der Ausgang Threema an; ohne Anbindung fehlt der Weg.
     let w = welt().await;
     let lid = w.lagebericht(true).await;
     sqlx::query(
@@ -535,7 +535,7 @@ async fn threema_adresse_ist_422_nicht_unterstuetzt() {
     .unwrap();
     let (s, v) = w.lb_senden(lid, "f-1", &[w.kanaele[0]]).await;
     assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
-    assert!(v.to_string().contains("noch nicht unterstützt"), "{v}");
+    assert!(v.to_string().contains("anbindung_fehlt"), "{v}");
     assert_eq!(w.anzahl().await, 0);
 }
 
