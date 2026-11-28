@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, einsatz_anlegen_mit, login_cookie, setup};
 
 async fn katalog(app: &axum::Router, admin: &str, bezeichnung: &str, betriebsart: &str) -> i64 {

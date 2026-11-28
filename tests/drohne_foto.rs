@@ -14,7 +14,7 @@ use lifeline_hub::drohne::Store;
 use lifeline_hub::live::LiveHub;
 use std::sync::Arc;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen_mit, login_cookie};
 
 struct Umgebung {

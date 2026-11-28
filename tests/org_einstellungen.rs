@@ -10,7 +10,7 @@ use lifeline_hub::org::einstellungen as org_einstellungen;
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, login_cookie, setup};
 
 // ----------------------------- Test-Harness -----------------------------

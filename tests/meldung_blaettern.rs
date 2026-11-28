@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use serde_json::{json, Value};
 use std::collections::HashSet;
 
-mod common;
+use crate::common;
 use common::{anfrage, anfrage_json, einsatz_anlegen, login_cookie, setup_mit_pool};
 
 fn meldung(inhalt: &str, richtung: &str) -> Value {

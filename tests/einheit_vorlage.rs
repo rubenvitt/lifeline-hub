@@ -7,7 +7,7 @@ use lifeline_hub::live::org::{OrgLiveEvent, OrgNachricht};
 use serde_json::Value;
 use tokio::sync::broadcast::Receiver;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool,
     setup_mit_pool_und_live,

@@ -22,7 +22,7 @@ use sqlx::SqlitePool;
 use std::time::Duration;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::*;
 
 type Spalten = (Option<f64>, Option<f64>, Option<String>, Option<String>);

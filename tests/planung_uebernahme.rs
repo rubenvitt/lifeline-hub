@@ -8,7 +8,7 @@ use axum::http::StatusCode;
 use lifeline_hub::app::RouterOptionen;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 const PFAD: &str = "/api/plans";

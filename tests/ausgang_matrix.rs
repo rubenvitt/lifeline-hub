@@ -30,8 +30,8 @@ use matrix_sdk::test_utils::wiremock::{Mock, MockGuard, Request, ResponseTemplat
 use matrix_sdk_test::{event_factory::EventFactory, JoinedRoomBuilder};
 use serde_json::{json, Value};
 
-mod adapter_testart;
-mod common;
+use crate::adapter_testart;
+use crate::common;
 use common::{anfrage, anfrage_json, einsatz_anlegen_mit, login_cookie, multipart_post, png_bytes};
 
 const BOT: &str = "@lifeline:example.org";

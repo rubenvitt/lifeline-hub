@@ -10,7 +10,7 @@ use lifeline_hub::staerke::{Staerke, StaerkePosition};
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 use common::*;
 
 /// Der Demo-„Sanitätszug Musterstadt“ mit „Rettungsstaffel“ als Vorlage der Org des Admins.

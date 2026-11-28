@@ -1,14 +1,14 @@
 //! Dediziertes Test-Binary (LFH-999): der Upload eines UHS-Plans läuft durch den AV-Scan, BEVOR
 //! etwas gespeichert wird — Scanner nicht erreichbar: 503, weder Plan noch ETB-Eintrag.
 //!
-//! Eigenes Binary, weil `init_scan_config` eine prozessglobale OnceLock setzt (Muster
+//! Eigenes Bündel, weil `init_scan_config` eine prozessglobale OnceLock setzt (Muster
 //! `tests/uhs_anhang_scan.rs`). Läuft in BEIDEN Builds: Default (clamav an) → echter
 //! Verbindungsversuch gegen `127.0.0.1:1`; `--no-default-features` → Stub, gleiches Ergebnis.
 
 use axum::http::StatusCode;
 use lifeline_hub::anhang::{init_scan_config, ScanConfig};
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, plan_hochladen, png_bytes, setup_mit_pool};
 
 #[tokio::test]

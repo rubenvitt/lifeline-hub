@@ -12,7 +12,7 @@ use lifeline_hub::live::LiveHub;
 use lifeline_hub::meldung::rueckmeldung::ueberfaellige_melden;
 use serde_json::json;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, login_cookie, rolle_setzen,
     setup_mit_pool_und_live,

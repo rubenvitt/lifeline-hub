@@ -10,7 +10,7 @@ use lifeline_hub::live::{LiveEvent, LiveNachricht};
 use serde_json::{json, Value};
 use tokio::sync::broadcast::Receiver;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {

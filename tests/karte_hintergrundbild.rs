@@ -13,7 +13,7 @@ use axum::http::{header, HeaderMap, Request, StatusCode};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, karten_ansicht_anlegen, login_cookie, rolle_setzen,
     setup, setup_mit_pool, standard_ansicht_id,

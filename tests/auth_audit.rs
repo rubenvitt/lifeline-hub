@@ -11,7 +11,7 @@ use axum::http::{header, Request, StatusCode};
 use std::net::SocketAddr;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::setup_mit_pool;
 
 async fn login(app: &axum::Router, benutzername: &str, passwort: &str) -> StatusCode {

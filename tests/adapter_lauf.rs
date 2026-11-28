@@ -12,8 +12,8 @@ use lifeline_hub::adapter::lauf::durchgang;
 use lifeline_hub::adapter::zustand::AdapterFehler;
 use serde_json::{json, Value};
 
-mod adapter_testart;
-mod common;
+use crate::adapter_testart;
+use crate::common;
 use common::{anfrage_json, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_state};
 use lifeline_hub::live::LiveHub;
 

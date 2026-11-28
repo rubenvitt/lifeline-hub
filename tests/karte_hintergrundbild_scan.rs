@@ -1,7 +1,7 @@
 //! Dediziertes Test-Binary (LFH-238): beweist, dass der Karten-Hintergrundbild-Upload
 //! den AV-Scan-Seam durchläuft (scan-vor-persist, wie der generische Anhang-Upload).
 //!
-//! Warum ein EIGENES Binary: `init_scan_config` setzt eine prozessglobale OnceLock. Auf
+//! Warum ein EIGENES Bündel: `init_scan_config` setzt eine prozessglobale OnceLock. Auf
 //! fail-closed + unerreichbaren clamd gestellt, würde das JEDEN Upload im Prozess auf 503
 //! kippen — deshalb isoliert von der übrigen karte_hintergrundbild-Suite. Läuft in BEIDEN
 //! Builds grün: Default (clamav an) → echter `clamd_scan` gegen `127.0.0.1:1` (ECONNREFUSED)
@@ -13,7 +13,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::anhang::{init_scan_config, ScanConfig};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup};
 
 const ECKEN: &str = "[[9.0,50.0],[9.1,50.0],[9.1,49.9],[9.0,49.9]]";

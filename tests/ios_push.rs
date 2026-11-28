@@ -9,7 +9,7 @@ use lifeline_hub::web_push::krypto::b64;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::relais::{oeffnen, relais_doppel, RelaisDoppel};
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool_und_live,

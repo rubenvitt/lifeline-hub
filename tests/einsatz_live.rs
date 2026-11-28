@@ -13,7 +13,7 @@ use axum::http::StatusCode;
 use lifeline_hub::live::{LiveEvent, LiveNachricht};
 use tokio::sync::broadcast::Receiver;
 
-mod common;
+use crate::common;
 use common::*;
 
 /// Leert den Empfänger und liefert alle bis hierher publizierten Nachrichten.

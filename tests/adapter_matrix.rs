@@ -24,7 +24,7 @@ use matrix_sdk::test_utils::wiremock::matchers::{method, path};
 use matrix_sdk::test_utils::wiremock::{Mock, ResponseTemplate};
 use serde_json::{json, Map, Value};
 
-mod common;
+use crate::common;
 use common::{anfrage_json, login_cookie, setup_mit_state};
 
 const LISTE: &str = "/api/admin/adapter";

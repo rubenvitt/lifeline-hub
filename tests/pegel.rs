@@ -14,7 +14,7 @@ use lifeline_hub::karte::cache;
 use lifeline_hub::pegel::trend::Messpunkt;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::*;
 
 const A: &str = "a6ee8177-107b-47dd-bcfd-30960ccc6e9c";

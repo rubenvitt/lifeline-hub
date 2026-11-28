@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 
-mod common;
+use crate::common;
 use common::*;
 
 // ---------- Tests ----------

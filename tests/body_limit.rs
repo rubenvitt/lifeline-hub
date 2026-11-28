@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup};
 
 /// `JSON_BODY_MAX` in `src/app.rs`.

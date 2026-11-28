@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
 
 const AUFTRAG_BODY: &str = r#"{"auftrag_text":"Sandsäcke","empfaenger":[{"empfaenger_typ":"funktion","funktion_text":"S4"}]}"#;

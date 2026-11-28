@@ -9,7 +9,7 @@ use axum::http::{header, Request, StatusCode};
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{benutzer_anlegen, login_cookie, setup};
 
 async fn anfrage(

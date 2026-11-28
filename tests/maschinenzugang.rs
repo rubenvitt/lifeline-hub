@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::{anfrage_json, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
 const LISTE: &str = "/api/admin/integrations";

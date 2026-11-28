@@ -4,7 +4,7 @@ use axum::http::StatusCode;
 use serde_json::Value;
 use std::collections::HashSet;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup_mit_pool};
 
 async fn anlegen(app: &axum::Router, cookie: &str, e: i64, n: usize) -> Vec<i64> {

@@ -3,7 +3,7 @@
 //! irgendetwas gespeichert wird — Scanner nicht erreichbar: 503, weder Datei noch
 //! Verknüpfung noch ETB-Eintrag.
 //!
-//! Eigenes Binary, weil `init_scan_config` eine prozessglobale OnceLock setzt: fail-closed
+//! Eigenes Bündel, weil `init_scan_config` eine prozessglobale OnceLock setzt: fail-closed
 //! gegen einen unerreichbaren clamd kippte sonst jeden Upload der übrigen Suite auf 503
 //! (Muster `tests/karte_hintergrundbild_scan.rs`). Läuft in BEIDEN Builds: Default (clamav
 //! an) → echter Verbindungsversuch gegen `127.0.0.1:1` (ECONNREFUSED);
@@ -14,7 +14,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::anhang::{init_scan_config, ScanConfig};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup_mit_pool};
 
 #[tokio::test]

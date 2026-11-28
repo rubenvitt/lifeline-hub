@@ -9,7 +9,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::live::LiveEvent;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::*;
 
 /// Ein SSE-Frame, wie der Browser es sieht.

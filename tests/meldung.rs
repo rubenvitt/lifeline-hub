@@ -4,7 +4,7 @@ use lifeline_hub::live::LiveEvent;
 use serde_json::Value;
 use std::time::Duration as StdDuration;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
     rolle_setzen, setup, setup_mit_pool, setup_mit_pool_und_live,

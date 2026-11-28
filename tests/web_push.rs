@@ -16,7 +16,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool_und_live,
 };

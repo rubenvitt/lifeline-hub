@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::{anfrage_json, einsatz_anlegen, login_cookie, setup};
 
 /// Geschlossener Ring aus `n` Positionen um (9, 51), wie ihn terra-draw liefert.

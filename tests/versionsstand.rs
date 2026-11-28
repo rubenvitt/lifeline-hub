@@ -11,7 +11,7 @@ use lifeline_hub::versionsstand::repo;
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup_mit_pool};
 
 const PFAD: &str = "/api/release-notes";

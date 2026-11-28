@@ -9,7 +9,7 @@ use axum::http::StatusCode;
 use chrono::{DateTime, Duration, DurationRound, Utc};
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 fn abloesung_pfad(einsatz: i64) -> String {

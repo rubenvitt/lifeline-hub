@@ -9,7 +9,7 @@ use axum::http::{header, Request, StatusCode};
 use http_body_util::BodyExt;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup, test_state};
 
 use lifeline_hub::live::strom::StromGrenzen;

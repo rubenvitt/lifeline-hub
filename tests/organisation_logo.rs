@@ -16,7 +16,7 @@ use lifeline_hub::anhang::{entscheide, ScanErgebnis};
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup, setup_mit_pool};
 
 const MIB: usize = 1024 * 1024;

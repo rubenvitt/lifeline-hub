@@ -2,7 +2,7 @@ use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup, setup_mit_pool};
 
 #[tokio::test]

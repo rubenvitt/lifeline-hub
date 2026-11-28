@@ -16,7 +16,7 @@ use lifeline_hub::stammdaten_eingang::repo::{
 use lifeline_hub::stammdaten_eingang::{DateiMeldung, StammdatenArt, StammdatenPaket};
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 
 async fn pool() -> (SqlitePool, i64) {
     let (_app, pool) = common::setup_mit_pool().await;

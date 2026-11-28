@@ -18,7 +18,7 @@ use chrono::{Duration, NaiveDateTime, Utc};
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie};
 
 /// Eine Stelle, die einen Scrub-Wert in den Wortlaut eines ETB-Eintrags übernimmt.

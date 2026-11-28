@@ -4,7 +4,7 @@ use lifeline_hub::db;
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::login_cookie;
 
 /// Gibt eine garantiert verweigerte Geocoder-URL zurück (Ephemeral-Port binden + sofort freigeben).

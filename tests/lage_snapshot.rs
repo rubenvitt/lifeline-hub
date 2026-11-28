@@ -8,7 +8,7 @@ use lifeline_hub::lage_snapshot::repo;
 use serde_json::json;
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup_mit_pool,
 };

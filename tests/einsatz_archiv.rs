@@ -9,7 +9,7 @@ use sqlx::SqlitePool;
 use std::io::Read;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie};
 
 fn probe_lesen(probe: &str, identitaet: &age::x25519::Identity) -> String {

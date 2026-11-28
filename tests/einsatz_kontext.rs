@@ -13,7 +13,7 @@ use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{benutzer_anlegen, login_cookie, setup_mit_pool};
 
 async fn status_von(app: &axum::Router, uri: &str, cookie: Option<&str>) -> StatusCode {

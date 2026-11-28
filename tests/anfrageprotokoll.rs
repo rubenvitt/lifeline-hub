@@ -7,7 +7,7 @@ use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
 use tower::ServiceExt; // oneshot
 
-mod common;
+use crate::common;
 
 /// Schickt `GET /api/health` mit den gegebenen `x-request-id`-Köpfen und liefert die IDs der
 /// Antwort.

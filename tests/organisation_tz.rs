@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt; // stellt `oneshot` bereit
 
-mod common;
+use crate::common;
 use common::{anfrage, login_cookie, setup};
 
 /// Legt über die Admin-Benutzerverwaltung einen normalen Nutzer

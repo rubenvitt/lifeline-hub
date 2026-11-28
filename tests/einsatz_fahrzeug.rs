@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 
-mod common;
+use crate::common;
 use common::*;
 
 /// Legt ein Stamm-Fahrzeug an (Admin) und liefert dessen id.

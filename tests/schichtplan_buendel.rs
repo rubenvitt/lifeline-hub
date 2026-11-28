@@ -10,7 +10,7 @@ use chrono::{DateTime, Duration, DurationRound, Utc};
 use lifeline_hub::erinnerung::scheduler::tick_einmal;
 use serde_json::json;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn f(t: DateTime<Utc>) -> String {

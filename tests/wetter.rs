@@ -17,7 +17,7 @@ use axum::http::StatusCode;
 use chrono::{SecondsFormat, Utc};
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 struct Umgebung {

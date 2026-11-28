@@ -8,7 +8,7 @@ use lifeline_hub::stammdaten_eingang::schnappschuss::{ablegen, Anzahl};
 use serde_json::{json, Value};
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 use common::{anfrage_json, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
 const LISTE: &str = "/api/master-data/import/snapshots";

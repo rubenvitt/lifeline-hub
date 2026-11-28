@@ -6,8 +6,8 @@ use axum::http::StatusCode;
 use lifeline_hub::live::LiveHub;
 use serde_json::{json, Value};
 
-mod adapter_testart;
-mod common;
+use crate::adapter_testart;
+use crate::common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie,
     multipart_post, png_bytes, rolle_setzen,

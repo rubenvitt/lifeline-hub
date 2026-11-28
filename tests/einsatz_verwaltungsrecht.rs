@@ -7,7 +7,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 /// Einsatz einer Führungskraft der eigenen Org: der Admin ist dort KEIN Mitglied.

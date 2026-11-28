@@ -7,7 +7,7 @@
 use axum::http::StatusCode;
 use serde_json::json;
 
-mod common;
+use crate::common;
 use common::{anfrage_json, einsatz_anlegen, login_cookie, person_anlegen, setup_mit_pool};
 
 // ---------- Domänen-Helfer ----------

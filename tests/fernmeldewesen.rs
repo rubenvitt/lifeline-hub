@@ -5,7 +5,7 @@
 
 use axum::http::StatusCode;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn plan_pfad(einsatz: i64) -> String {
