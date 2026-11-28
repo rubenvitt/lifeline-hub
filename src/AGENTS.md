@@ -350,7 +350,11 @@ Design-Doc `docs/superpowers/specs/2026-11-21-r19tuh60-adapter-rahmen-design.md`
     scheitert es vorübergehend (`Zeit` oder `MatrixFehler::Speicher`) und bleibt vorgemerkt, als
     Generation: ein Verwerfen während des Räumens räumt derselbe Halter, bevor er öffnet.
     `Speicher` (Datei-IO am Verzeichnis, Schließen, Löschen, Bau des Clients außerhalb des
-    SDK-Speichers) ist vorübergehend; `verschluesselung` bleibt Krypto und SDK-Speicher selbst. Nie öffnet ein neuer Client einen Speicher,
+    SDK-Speichers; zur Laufzeit Sperre, Zustands-, Ereignis- und Medienspeicher des SDK und
+    Datei-IO) ist vorübergehend; `verschluesselung` bleibt Krypto und Schlüsselspeicher selbst
+    und ist beim Prüfen `schluesselspeicher_unlesbar` (braucht Eingriff, LLH-2145). 403/404 des
+    eigenen `keys/query` ist ein verweigerter Schlüsselabgleich (Prüfen `abgelehnt`, Versand
+    `anbindung_fehler`), nie `kein_zutritt`. Nie öffnet ein neuer Client einen Speicher,
     solange der alte lebt. `rusqlite` kommt nur transitiv über `vendor/matrix-sdk-sqlite`
     ([ADR-0108](../docs/architektur/entscheidungen/ADR-0108-rusqlite-nur-transitiv-fuer-den-speicher-des-matrix-sdk.md)).
 
@@ -570,7 +574,9 @@ Design-Docs `docs/superpowers/specs/2026-11-24-w1ymakq6-ausgang-email-design.md`
   Verbindungsprüfung synct ohne Räume, ein inkrementeller Sync brächte Verschlüsselungszustand
   und Geräte nicht. **Nie `m.room.message` in einen verschlüsselten Raum:** das SDK verschlüsselt
   mit `CollectStrategy::AllDevices` (am Client gesetzt, nicht der Vorgabe überlassen), jeder Fehler
-  dabei ist `verschluesselung`, nie Rückfall auf Klartext. Text ist Teil 0, jede PNG-Anlage ein
+  der Verschlüsselung dabei ist `verschluesselung`, nie Rückfall auf Klartext. 403/404 erst beim
+  Senden (Mitgliedschaft steht fest; das SDK verteilt dabei Schlüssel, ohne den Endpunkt zu
+  nennen) ist `abgelehnt`, nicht `kein_zutritt` (LLH-2145). Text ist Teil 0, jede PNG-Anlage ein
   `m.image` mit Teil 1…; jeder Teil trägt die Transaktions-ID `ausgang-{versand_id}-{teil}`, und
   jeder gelungene Teil steht mit Event-ID in `ausgang_teil` (`Fehlschlag`/`Zustellt.teile`); ein
   späterer Versuch und „Erneut senden“ überspringen gemerkte Teile (`Versandauftrag::gesendet`).

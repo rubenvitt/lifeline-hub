@@ -119,6 +119,9 @@ pub fn fehler_text(fehler: AdapterFehler, status: Option<i64>) -> String {
         SchluesselPassenNicht => {
             "Schlüssel passen nicht zum Gerät des Tokens. Ein neues Access-Token anlegen."
         }
+        SchluesselspeicherUnlesbar => {
+            "Schlüsselspeicher nicht zu öffnen (Passphrase oder Speicher beschädigt)"
+        }
     };
     match status {
         Some(s) => format!("{text} ({s})"),

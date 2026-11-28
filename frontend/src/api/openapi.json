@@ -1211,7 +1211,8 @@
           "einstellung_ungueltig",
           "version_unbekannt",
           "intern",
-          "schluessel_passen_nicht"
+          "schluessel_passen_nicht",
+          "schluesselspeicher_unlesbar"
         ]
       },
       "AdapterGeheimnisAnzeige": {

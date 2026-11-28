@@ -512,7 +512,7 @@ export interface components {
          * @description Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
          * @enum {string}
          */
-        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "version_unbekannt" | "intern" | "schluessel_passen_nicht";
+        AdapterFehler: "status" | "abgelehnt" | "weiterleitung" | "zeitueberschreitung" | "verbindung" | "tls" | "ziel_intern" | "dns" | "ziel_ungueltig" | "zu_gross" | "antwort_ungueltig" | "geheimnis_fehlt" | "geheimnis_unlesbar" | "geheimnisspeicher_gesperrt" | "einstellung_ungueltig" | "version_unbekannt" | "intern" | "schluessel_passen_nicht" | "schluesselspeicher_unlesbar";
         /** @description Ein Platz für ein Geheimnis, wie die Verwaltung ihn sieht. Nie der Wert. */
         AdapterGeheimnisAnzeige: {
             bezeichnung: string;

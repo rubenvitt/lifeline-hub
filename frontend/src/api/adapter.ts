@@ -118,6 +118,8 @@ export const ADAPTER_FEHLER_TEXT: Record<AdapterFehler, string> = {
   intern: 'Fehler im Server',
   schluessel_passen_nicht:
     'Schlüssel passen nicht zum Gerät des Tokens. Ein neues Access-Token anlegen.',
+  schluesselspeicher_unlesbar:
+    'Schlüsselspeicher nicht zu öffnen (Passphrase oder Speicher beschädigt)',
 };
 
 /** Klartext eines Fehlschlags, mit HTTP-Status, falls das Ziel antwortete. */

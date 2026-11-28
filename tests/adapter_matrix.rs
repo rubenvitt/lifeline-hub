@@ -150,6 +150,35 @@ async fn pruefung_mit_gueltigem_token_meldet_ok_und_geraet() {
     assert_eq!(abrufen(&art, &server, &token, "a1").await, Ok(0));
 }
 
+/// 403 oder 404 des eigenen `keys/query` beim ersten Öffnen ist ein verweigerter
+/// Schlüsselabgleich (Eingriff nötig), weder „kein Zutritt zum Raum“ noch „Antwort ungültig“
+/// (LLH-2145).
+#[tokio::test]
+async fn verweigerter_schluesselabgleich_ist_abgelehnt() {
+    for status in [403_u16, 404] {
+        let server = MatrixMockServer::new().await;
+        whoami(&server, "BOT1").await;
+        Mock::given(method("POST"))
+            .and(path("/_matrix/client/v3/keys/query"))
+            .respond_with(ResponseTemplate::new(status).set_body_json(json!({
+                "errcode": if status == 403 { "M_FORBIDDEN" } else { "M_NOT_FOUND" },
+                "error": "nein"
+            })))
+            .mount(server.server())
+            .await;
+        let basis = tempfile::tempdir().unwrap();
+        let clients = clients(&basis);
+
+        let f = matrix::pruefe(&clients, &ziel(&server, "t", "a1"))
+            .await
+            .unwrap_err();
+        assert_eq!(f, MatrixFehler::SchluesselabgleichVerweigert, "{status}");
+        assert_eq!(AdapterFehler::from(f), AdapterFehler::Abgelehnt);
+        // Kein Speicher für ein Gerät, dessen Schlüsselstand unbekannt ist.
+        assert!(!basis.path().join("matrix/a1").exists());
+    }
+}
+
 #[tokio::test]
 async fn ungueltiges_token_ist_abgelehnt() {
     let server = MatrixMockServer::new().await;
