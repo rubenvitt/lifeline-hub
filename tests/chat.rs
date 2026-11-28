@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen, setup};
 
 /// GET kanaele legt den Default-Kanal an und gibt ihn zurück.

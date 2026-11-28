@@ -7,7 +7,7 @@ use chrono::{Duration, Utc};
 use serde_json::Value;
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen};
 
 const FMT: &str = "%Y-%m-%d %H:%M:%S";

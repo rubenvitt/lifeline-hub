@@ -2,7 +2,7 @@
 //! („ZIP mit Anhängen und Tabellen“, „ZIP-Abruf wird protokolliert“, „Vollständig oder gar
 //! nicht“, „Ein ZIP-Bau je Einsatz zugleich“).
 
-mod common;
+use crate::common;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};

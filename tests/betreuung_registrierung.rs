@@ -9,7 +9,7 @@ use axum::http::{header, Request, StatusCode};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn b(e: i64) -> String {

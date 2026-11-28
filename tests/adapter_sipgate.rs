@@ -5,8 +5,8 @@ use lifeline_hub::adapter::art::Verzeichnis;
 use lifeline_hub::adapter::sipgate::SipgateFehler;
 use serde_json::{json, Value};
 
-mod adapter_testart;
-mod common;
+use crate::adapter_testart;
+use crate::common;
 use common::{anfrage_json, login_cookie, setup_mit_state};
 
 const LISTE: &str = "/api/admin/adapter";

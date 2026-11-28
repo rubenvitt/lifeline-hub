@@ -17,7 +17,7 @@ use lifeline_hub::karte::registry::repo;
 use std::sync::Arc;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::login_cookie;
 
 /// Testaufbau mit festem Katalog und aufzeichnendem Lader.

@@ -2,7 +2,7 @@ use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::*;
 
 async fn post_vorschlag(app: &axum::Router, cookie: &str, text: &str) -> StatusCode {

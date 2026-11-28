@@ -6,7 +6,7 @@ use axum::{
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 
 #[tokio::test]
 async fn schwaerzung_entfernt_fuehrungsstelle_nur_im_betroffenen_einsatz() {

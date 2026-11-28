@@ -5,7 +5,7 @@ use axum::http::{header, HeaderMap, Request, StatusCode};
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {

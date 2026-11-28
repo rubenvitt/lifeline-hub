@@ -14,7 +14,7 @@ use lifeline_hub::drohne::vertrag::{DrohnenFoto, DrohnenLage, Fluggeraet};
 use lifeline_hub::drohne::Store;
 use lifeline_hub::live::LiveHub;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen_mit, fremde_org_anlegen, login_cookie};
 
 struct Umgebung {

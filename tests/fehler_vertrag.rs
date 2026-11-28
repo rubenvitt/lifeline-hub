@@ -8,7 +8,7 @@
 //!
 //! Diese Datei prüft die querschnittlichen Fälle, die KEINE Route einzeln abdeckt.
 
-mod common;
+use crate::common;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};

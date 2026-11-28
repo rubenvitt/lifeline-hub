@@ -170,10 +170,10 @@ schritt_4() {
   ohne_dev_env cargo test -p lifeline-desktop
 }
 
-# Nur in GitHub Actions: Die rund 300 Testprogramme (je Datei in `tests/` eines, jedes mit der
-# ganzen Bibliothek) brauchen zusammen gut 95 GB. Am 26.11. lief der Runner damit voll
-# (LLH-2150), am 27.11. blieben auf dem Abbild 20261122 rund 100 GB frei, und der Runner starb
-# zweimal mitten im Linken („lost communication“). Deshalb in Teilen: erst Bibliothek, Binaries
+# Nur in GitHub Actions: Bis LLH-2150 war jede Datei in `tests/` ein eigenes Testprogramm mit
+# der ganzen Bibliothek, rund 300 zusammen gut 95 GB. Am 26.11. lief der Runner damit voll, am
+# 27.11. starb er zweimal mitten im Linken („lost communication“). Seitdem sind es 42
+# (Bündel, `src/AGENTS.md`); das Teilen bleibt als Reserve. In Teilen: erst Bibliothek, Binaries
 # und Beispiele, dann Doku-Tests, dann die Integrationstests in RUST_TEST_TEILE Gruppen (Vorgabe
 # 4); nach jedem Teil gehen dessen Testprogramme weg. Dieselbe Auswahl wie `cargo test
 # --workspace --exclude lifeline-desktop`, mit derselben Feature-Vereinigung (immer

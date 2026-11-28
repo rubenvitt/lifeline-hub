@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::time::Duration;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, erfassungs_anhang, login_cookie, person_anhang,
     rolle_setzen, schaden_anhang, setup_mit_pool_und_live, Erfassung, MINI_JPEG,

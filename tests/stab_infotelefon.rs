@@ -7,7 +7,7 @@ use axum::http::StatusCode;
 use serde_json::Value;
 use std::time::Duration;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn pfad(e: i64) -> String {

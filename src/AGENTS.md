@@ -165,6 +165,35 @@ Gilt für Backend (`proptest`) und Frontend (`fast-check`).
 - **Beleg:** eine Mutationsprobe am Code macht die Eigenschaft rot (wie bei jedem Test,
   `AGENTS.md`, „Qualitäts-Gates“).
 
+## Backend — Integrationstests in Bündeln (LLH-2150)
+
+Jedes Testprogramm linkt die ganze Bibliothek (~300 MB). Deshalb sind die Dateien in `tests/`
+Module weniger Bündel und keine eigenen Programme. Herleitung, Messwerte und Zuschnitt stehen in
+`docs/superpowers/specs/2026-11-28-rf4pu0av-testprogramme-buendeln-design.md`.
+
+- **Neue Testdatei:** Sie bleibt in `tests/<name>.rs` und bekommt eine Zeile
+  `#[path = "../<name>.rs"] mod <name>;` in der Wurzel `tests/buendel_<bereich>/main.rs` des
+  Fachbereichs. Hilfen bindet sie mit `use crate::common;` ein (dasselbe gilt für
+  `instanz_hilfen` und `adapter_testart`), nicht mit `mod common;`. `Cargo.toml` setzt
+  `autotests = false`: Eine Datei ohne Eintrag liefe still nie. `tests/testprogramme_guard.rs`
+  verlangt deshalb, dass jede `tests/*.rs` genau einmal eingetragen ist.
+- **Eigenständig** (eigenes `[[test]]` in `Cargo.toml`, `mod common;`) wird eine Datei nur, wenn
+  sie den Prozess nicht teilen kann:
+  - Sie ruft einen **prozessweiten Setzer** auf (`let _ = X.set(..)` an einem `OnceLock`, etwa
+    `init_scan_config`, `set_oidc_konfiguriert`, `stammdaten::set_live`). Im Bündel entschiede
+    die Laufreihenfolge, welchen Wert alle sehen. Die Liste der Setzer führt der Wächter; ein
+    neuer Setzer kommt dorthin.
+  - Sie startet echte Instanzen über `instanz_hilfen` oder erzeugt sonst über eine echte
+    Verbindung von 127.0.0.1 Fehlversuche. Die Sperre in `auth::rate_limit` (10 je 300 s) gilt
+    je Quelle und Prozess. Die 13 Kopplungsdateien sperrten sich im Bündel gegenseitig aus,
+    abhängig von der Reihenfolge (gemessen: 48 Fehler).
+  - Sie setzt einen globalen `tracing`-Subscriber.
+  - Ein Skript ruft sie per `--test <name>` auf.
+  - Setzen alle Dateien eines Bündels denselben Wert, dürfen sie sich ein eigenes Bündel teilen
+    (`buendel_scan`). Der Kopf der Bündelwurzel nennt den Wert, `ERLAUBT` im Wächter das Paar.
+- **Lokal einzeln:** `cargo test --test buendel_<bereich> <name>::`. Eine Änderung an einer Datei
+  baut ihr ganzes Bündel neu.
+
 ## Backend — Öffentliche API v1 (LLH-1653)
 
 Vertrag für Fremdsysteme unter `/api/v1/` ([ADR-0096](../docs/architektur/entscheidungen/ADR-0096-fremdsysteme-sprechen-signiert-mit-der-oeffentlichen-api-v1-zusage-ab-1-0.md),

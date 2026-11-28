@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 struct Welt {

@@ -2,7 +2,7 @@
 //! Status, Import, Neu-Import und Entfernen samt `lagged`, „DB wie vorher“ und die Messung der
 //! Dauer, alles über HTTP.
 
-mod common;
+use crate::common;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};

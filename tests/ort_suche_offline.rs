@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie};
 
 /// Stub für `/search`: zählt Aufrufe.

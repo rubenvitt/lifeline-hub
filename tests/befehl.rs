@@ -6,7 +6,7 @@
 
 use axum::http::StatusCode;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup};
 
 /// Legt einen Befehls-Entwurf aus der Vorlage `befehl_lad` an (Abschnitte: lage, auftrag,

@@ -10,7 +10,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn pfad(einsatz: i64) -> String {

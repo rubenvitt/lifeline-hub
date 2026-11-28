@@ -1,6 +1,6 @@
 use axum::http::StatusCode;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup, setup_mit_pool};
 
 // ---------- Tests ----------

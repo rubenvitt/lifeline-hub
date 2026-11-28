@@ -8,7 +8,7 @@ use lifeline_hub::live::LiveNachricht;
 use serde_json::{json, Value};
 use tokio::sync::broadcast::Receiver;
 
-mod common;
+use crate::common;
 use common::*;
 
 async fn fetch_json(app: &axum::Router, cookie: &str, pfad: &str) -> Value {

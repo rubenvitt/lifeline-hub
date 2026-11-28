@@ -3,7 +3,7 @@ use axum::http::{header, HeaderMap, Request, StatusCode};
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, erfassungs_datei, login_cookie, person_anhang,
     rolle_setzen, schaden_anhang, setup, setup_mit_pool, Erfassung, MINI_JPEG, MINI_PNG,

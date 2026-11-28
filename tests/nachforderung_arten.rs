@@ -4,7 +4,7 @@
 //! laufenden (D2), ohne geschwärzte oder gelöschte (D4), nach Zahl der Einsätze (D5).
 use axum::http::StatusCode;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen_mit, login_cookie, rolle_setzen, setup_mit_pool,
 };

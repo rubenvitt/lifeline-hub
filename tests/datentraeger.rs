@@ -1,7 +1,7 @@
 //! LFH-1100: `GET /api/system/storage` — Rechte, Stand vor der ersten Prüfung und die
 //! Warnregel samt Zusicherung externer Verschlüsselung, über HTTP.
 
-mod common;
+use crate::common;
 
 use axum::body::Body;
 use axum::http::{Request, StatusCode};

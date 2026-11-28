@@ -5,6 +5,9 @@ version.workspace = true
 edition = "2021"
 # Einzige Quelle der Lizenz (LLH-1446, `src/lizenz.rs`).
 license-file = "LICENSE"
+# Testprogramme stehen unten als [[test]], nicht je Datei in tests/ (LLH-2150, `src/AGENTS.md`,
+# „Integrationstests in Bündeln“; Wächter: tests/testprogramme_guard.rs).
+autotests = false
 
 [dependencies]
 axum = { version = "0.8", features = ["multipart"] }
@@ -219,6 +222,177 @@ proptest = { version = "1", default-features = false, features = ["std"] }
 matrix-sdk = { version = "=0.20.0", default-features = false, features = ["e2e-encryption", "sqlite", "rustls-aws-lc-rs", "markdown", "testing"] }
 # Sync-Antworten und Raumereignisse für den Mock-Server; dieselbe Version wie matrix-sdk.
 matrix-sdk-test = "=0.20.0"
+
+# Testprogramme (LLH-2150): die Bündel aus tests/buendel_*/main.rs, danach die Dateien, die
+# einen eigenen Prozess brauchen (prozessweiter Setzer, globaler Subscriber, per --test
+# aufgerufen). Jedes Programm linkt die ganze Bibliothek (~300 MB).
+[[test]]
+name = "buendel_benachrichtigung"
+path = "tests/buendel_benachrichtigung/main.rs"
+
+[[test]]
+name = "buendel_einsatz"
+path = "tests/buendel_einsatz/main.rs"
+
+[[test]]
+name = "buendel_kommunikation"
+path = "tests/buendel_kommunikation/main.rs"
+
+[[test]]
+name = "buendel_kraefte"
+path = "tests/buendel_kraefte/main.rs"
+
+[[test]]
+name = "buendel_lage"
+path = "tests/buendel_lage/main.rs"
+
+[[test]]
+name = "buendel_personen"
+path = "tests/buendel_personen/main.rs"
+
+[[test]]
+name = "buendel_plattform"
+path = "tests/buendel_plattform/main.rs"
+
+[[test]]
+name = "buendel_scan"
+path = "tests/buendel_scan/main.rs"
+
+[[test]]
+name = "buendel_zugang"
+path = "tests/buendel_zugang/main.rs"
+
+[[test]]
+name = "admin_audit"
+path = "tests/admin_audit.rs"
+
+[[test]]
+name = "anmelde_audit"
+path = "tests/anmelde_audit.rs"
+
+[[test]]
+name = "anmelde_start_grenzen"
+path = "tests/anmelde_start_grenzen.rs"
+
+[[test]]
+name = "anmeldung_benutzername"
+path = "tests/anmeldung_benutzername.rs"
+
+[[test]]
+name = "auth"
+path = "tests/auth.rs"
+
+[[test]]
+name = "dev_absent"
+path = "tests/dev_absent.rs"
+
+[[test]]
+name = "dev_present"
+path = "tests/dev_present.rs"
+
+[[test]]
+name = "einsatz_anbindungen"
+path = "tests/einsatz_anbindungen.rs"
+
+[[test]]
+name = "instanz_abraeumen_live"
+path = "tests/instanz_abraeumen_live.rs"
+
+[[test]]
+name = "instanz_fuehrung"
+path = "tests/instanz_fuehrung.rs"
+
+[[test]]
+name = "instanz_fuehrung_live"
+path = "tests/instanz_fuehrung_live.rs"
+
+[[test]]
+name = "instanz_hinweise"
+path = "tests/instanz_hinweise.rs"
+
+[[test]]
+name = "instanz_ios_push_sperre_live"
+path = "tests/instanz_ios_push_sperre_live.rs"
+
+[[test]]
+name = "instanz_kopplung"
+path = "tests/instanz_kopplung.rs"
+
+[[test]]
+name = "instanz_lebensende"
+path = "tests/instanz_lebensende.rs"
+
+[[test]]
+name = "instanz_mitarbeit_nachtrag"
+path = "tests/instanz_mitarbeit_nachtrag.rs"
+
+[[test]]
+name = "instanz_spiegel"
+path = "tests/instanz_spiegel.rs"
+
+[[test]]
+name = "instanz_spiegel_live"
+path = "tests/instanz_spiegel_live.rs"
+
+[[test]]
+name = "instanz_stammdaten"
+path = "tests/instanz_stammdaten.rs"
+
+[[test]]
+name = "instanz_stammdaten_kataloge"
+path = "tests/instanz_stammdaten_kataloge.rs"
+
+[[test]]
+name = "instanz_stammdaten_live"
+path = "tests/instanz_stammdaten_live.rs"
+
+[[test]]
+name = "instanz_vor_ort"
+path = "tests/instanz_vor_ort.rs"
+
+[[test]]
+name = "karte"
+path = "tests/karte.rs"
+
+[[test]]
+name = "karte_fremdebene_scan"
+path = "tests/karte_fremdebene_scan.rs"
+
+[[test]]
+name = "lagebild_extern"
+path = "tests/lagebild_extern.rs"
+
+[[test]]
+name = "listen_abfragen"
+path = "tests/listen_abfragen.rs"
+
+[[test]]
+name = "login_sperre_proxy"
+path = "tests/login_sperre_proxy.rs"
+
+[[test]]
+name = "modul_zaehler_abfragen"
+path = "tests/modul_zaehler_abfragen.rs"
+
+[[test]]
+name = "oidc_discovery_ausfall"
+path = "tests/oidc_discovery_ausfall.rs"
+
+[[test]]
+name = "openapi_spec_aktuell"
+path = "tests/openapi_spec_aktuell.rs"
+
+[[test]]
+name = "ortung_spiegel"
+path = "tests/ortung_spiegel.rs"
+
+[[test]]
+name = "public_api_ereignis_trigger"
+path = "tests/public_api_ereignis_trigger.rs"
+
+[[test]]
+name = "public_api_spec_aktuell"
+path = "tests/public_api_spec_aktuell.rs"
 
 [features]
 # clamav ist Default-AN (reines Rust). Der echte Scan braucht einen erreichbaren clamd; ohne

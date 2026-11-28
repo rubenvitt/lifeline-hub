@@ -7,7 +7,7 @@ use lifeline_machine_client::Credentials;
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
 
-mod common;
+use crate::common;
 use common::maschine::{angebunden_als, jetzt, schluessel, senden, signiert, ANBINDUNGEN};
 use common::{anfrage, anfrage_json, einsatz_anlegen_mit, login_cookie, setup_mit_pool};
 

@@ -66,18 +66,10 @@ jobs:
       statuses: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # Immer aufräumen, aber im Hintergrund: Die Suite baut je Datei in `tests/` ein eigenes
-      # Programm (rund 300 zu je ~300 MB) und füllte am 26.11. die 87 GB freien Platz (Abbruch
-      # „No space left on device“, 59574d3c und f200153f). Gelöscht werden vorinstallierte
-      # Toolchains, die dieser Job nicht anfasst (Node, pnpm und Rust kommen über mise und
-      # rustup); das ist fertig, lange bevor das Bauen so weit ist, der kritische Pfad zahlt
-      # nichts. `df` steht davor und im Schritt „Plattenplatz danach“. Strukturell: LLH-2150.
-      - name: Plattenplatz schaffen (im Hintergrund)
-        run: |
-          df -h /
-          nohup sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup \
-            /usr/local/share/boost /usr/share/swift /usr/local/share/powershell /opt/az \
-            "$AGENT_TOOLSDIRECTORY" > "$RUNNER_TEMP/aufraeumen.log" 2>&1 &
+      # Kein Aufräumen mehr: Seit LLH-2150 sind die Integrationstests in 42 statt 302
+      # Testprogrammen gebündelt (`src/AGENTS.md`, „Integrationstests in Bündeln“); am 26.11.
+      # füllten die 300 Programme die 87 GB freien Platz. `df` steht im Schritt „Plattenplatz
+      # danach“ und jede Minute im Stand-Log.
       # Die GTK-/WebKit-Pakete braucht die Desktop-Hülle (src-tauri, LFH-721): Schritt 4 testet
       # sie mit (`cargo test -p lifeline-desktop`). Umgebung wie nasm, kein Schritt neben check-all.sh.
       - name: System-Werkzeuge für die nativen Crates
@@ -102,7 +94,7 @@ jobs:
       # SPEICHER: 4 Kerne, 15 GB. Kalt gebaut (ohne Cache-Treffer) lief der Speicher am 26.11.
       # nach drei Minuten voll, die vorhandene Auslagerung (rund 3 GB) auch, und der Runner starb
       # mit „shutdown signal“ (Stand-Log im Rust-Job, f90df2a1). 12 GB Auslagerung, auf /mnt,
-      # wenn das eine eigene Platte ist, sonst auf / (kostet dann Platz, s. Plattenplatz).
+      # wenn das eine eigene Platte ist, sonst auf / (kostet dann 12 GB Platz).
       - name: Auslagerung vergrößern
         run: |
           ort=/swapfile

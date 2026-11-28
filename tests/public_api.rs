@@ -1,7 +1,7 @@
 //! Öffentliche API v1: Dokument, Body-Grenze und Montage (LLH-1653, Spec
 //! `oeffentliche-api-vertrag`). Die Fehlerform prüft `tests/fehler_vertrag.rs`.
 
-mod common;
+use crate::common;
 
 use axum::body::{to_bytes, Body};
 use axum::http::{header, Request, StatusCode};

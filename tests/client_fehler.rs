@@ -6,7 +6,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::{anfrage, anfrage_json, login_cookie, setup};
 
 use lifeline_hub::app::CLIENT_FEHLER_BODY_MAX;

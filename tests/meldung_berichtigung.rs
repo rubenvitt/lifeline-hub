@@ -5,7 +5,7 @@ use axum::http::StatusCode;
 use serde_json::{json, Value};
 use std::time::Duration;
 
-mod common;
+use crate::common;
 use common::{anfrage, einsatz_anlegen, login_cookie, setup, setup_mit_live};
 
 async fn melden(app: &axum::Router, cookie: &str, einsatz: i64, art: &str) -> Value {

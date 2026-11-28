@@ -15,7 +15,7 @@ use lifeline_hub::drohne::vertrag::{DrohnenLage, DrohnenVideo};
 use lifeline_hub::drohne::Store;
 use lifeline_hub::live::LiveHub;
 
-mod common;
+use crate::common;
 use common::{anfrage, anfrage_json, einsatz_anlegen_mit, login_cookie};
 
 /// Zeit des Abrufs bei uns im Testspeicher: 24.11.2025 16:00:00 UTC.

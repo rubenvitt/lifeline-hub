@@ -12,7 +12,7 @@ use lifeline_hub::live::LiveHub;
 use serde_json::{json, Value};
 use tower::ServiceExt; // stellt `oneshot` bereit
 
-mod common;
+use crate::common;
 use common::{anfrage_json, einsatz_anlegen, login_cookie, setup_mit_pool_und_live};
 
 /// `GET` auf `uri`, optional mit Cookie; liefert Status und JSON-Körper.

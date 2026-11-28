@@ -11,7 +11,7 @@ use std::io::{Read, Write};
 use std::path::Path;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie};
 
 const PFAD: &str = "/api/admin/archive/import";

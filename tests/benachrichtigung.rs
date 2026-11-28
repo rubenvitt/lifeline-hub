@@ -13,7 +13,7 @@ use lifeline_hub::live::{LiveEvent, LiveHub, Replay};
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, anfrage_mit_offline_queue_benutzer, benutzer_anlegen, einsatz_anlegen, login_cookie,
     rolle_setzen, setup_mit_pool_und_live,

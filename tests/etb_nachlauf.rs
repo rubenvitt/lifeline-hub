@@ -2,7 +2,7 @@
 //! `etb::nachlauf::klammer` meldet jeden in ihr committeten ETB-Eintrag, der nicht per
 //! `LiveHub::publiziere` hinausging.
 
-mod common;
+use crate::common;
 
 use common::*;
 use lifeline_hub::etb::nachlauf::{klammer, ohne_verteilung};

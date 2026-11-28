@@ -9,7 +9,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::*;
 
 async fn erfassen(app: &axum::Router, cookie: &str, einsatz: i64, body: &str) -> Value {

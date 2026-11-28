@@ -10,7 +10,7 @@ use axum::body::Body;
 use axum::http::{header, HeaderMap, Request, StatusCode};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{einsatz_anlegen, login_cookie, schaden_anhang, setup, setup_mit_pool};
 
 async fn kopf(app: &axum::Router, uri: &str, cookie: Option<&str>) -> (StatusCode, HeaderMap) {

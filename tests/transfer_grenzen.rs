@@ -16,7 +16,7 @@ use lifeline_hub::transfer::MAX_GLEICHZEITIGE_UPLOADS;
 use std::time::Duration;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{einsatz_anlegen, login_cookie, setup_mit_optionen, MINI_JPEG, MINI_PNG};
 
 const GRENZE: &str = "LFHTRANSFERGRENZE";

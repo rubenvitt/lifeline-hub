@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 /// Der 409-Text einer offenen Pause, wortgleich (`abloesung::schichtplan::vollzug::PAUSE_OFFEN`).

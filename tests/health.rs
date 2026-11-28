@@ -5,7 +5,7 @@ use lifeline_hub::db;
 use lifeline_hub::live::LiveHub;
 use tower::ServiceExt; // stellt `oneshot` bereit
 
-mod common;
+use crate::common;
 
 #[tokio::test]
 async fn health_endpoint_returns_ok() {

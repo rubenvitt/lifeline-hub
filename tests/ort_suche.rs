@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einsatz_anlegen, fremde_org_anlegen, login_cookie, rolle_setzen,
     setup_mit_pool,

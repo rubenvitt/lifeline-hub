@@ -7,7 +7,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_pool};
 
 const ANMELDUNGEN: &str = "/api/access-log/logins";

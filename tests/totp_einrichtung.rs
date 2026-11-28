@@ -8,7 +8,7 @@ use axum::body::Body;
 use axum::http::{header, Request, StatusCode};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup_mit_pool};
 
 const PFAD: &str = "/api/auth/totp/enroll/start";

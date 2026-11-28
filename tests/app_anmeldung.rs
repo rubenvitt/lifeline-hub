@@ -14,7 +14,7 @@ use std::time::Instant;
 use tokio::sync::{Mutex, MutexGuard};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, login_cookie, setup_mit_pool};
 
 // RFC 7636, Anhang B.

@@ -12,7 +12,7 @@ use lifeline_hub::live::LiveHub;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage, anfrage_json, benutzer_anlegen, einsatz_anlegen, login_cookie, rolle_setzen,
     setup_mit_pool_und_live,

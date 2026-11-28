@@ -6,7 +6,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::{
     anfrage, benutzer_anlegen, einheit_bilden, einsatz_anlegen, funktion_setzen, login_cookie,
     rolle_setzen, setup_mit_optionen_auf, setup_mit_pool,

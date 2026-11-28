@@ -7,7 +7,7 @@ use lifeline_hub::drohne::suchlage::Upstream;
 use lifeline_hub::drohne::vertrag::DrohnenLage;
 use sqlx::SqlitePool;
 
-mod common;
+use crate::common;
 use common::{einsatz_anlegen_mit, login_cookie};
 
 struct Umgebung {

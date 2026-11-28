@@ -13,7 +13,7 @@ use image::{ExtendedColorType, ImageEncoder, Rgb, RgbImage};
 use serde_json::Value;
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::*;
 
 const ADMIN_PW: &str = "startpw12";

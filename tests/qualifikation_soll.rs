@@ -4,7 +4,7 @@
 use axum::http::StatusCode;
 use serde_json::{json, Value};
 
-mod common;
+use crate::common;
 use common::*;
 
 async fn katalog(app: &axum::Router, cookie: &str) -> Vec<Value> {

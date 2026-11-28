@@ -7,8 +7,8 @@ use lifeline_hub::adapter::live::{live_kontext, LiveVerweigert};
 use lifeline_hub::adapter::Rahmen;
 use serde_json::json;
 
-mod adapter_testart;
-mod common;
+use crate::adapter_testart;
+use crate::common;
 use common::{anfrage_json, login_cookie, setup_mit_state};
 
 const LISTE: &str = "/api/admin/adapter";

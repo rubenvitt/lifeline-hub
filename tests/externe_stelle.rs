@@ -5,7 +5,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::{anfrage, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup, setup_mit_pool};
 
 const PFAD: &str = "/api/external-agencies";

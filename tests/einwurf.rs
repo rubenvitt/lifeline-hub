@@ -14,7 +14,7 @@ use lifeline_hub::app::RouterOptionen;
 use serde_json::{json, Value};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{
     anfrage_json, benutzer_anlegen, fremde_org_anlegen, login_cookie, setup_mit_optionen,
     setup_mit_pool,

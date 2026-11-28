@@ -1,7 +1,7 @@
 //! Dediziertes Test-Binary (LFH-22): der Logo-Upload durchläuft den AV-Scan-Seam
 //! (scan-vor-persist) und lehnt bei unerreichbarem Scanner fail-closed mit 503 ab.
 //!
-//! Eigenes Binary aus demselben Grund wie `tests/karte_hintergrundbild_scan.rs`:
+//! Eigenes Bündel aus demselben Grund wie `tests/karte_hintergrundbild_scan.rs`:
 //! `init_scan_config` setzt eine prozessweite OnceLock und kippte in
 //! `tests/organisation_logo.rs` jeden Upload auf 503. Läuft in BEIDEN Builds grün: Default
 //! (clamav an) → echter `clamd_scan` gegen `127.0.0.1:1` (ECONNREFUSED); mit
@@ -12,7 +12,7 @@ use axum::http::{header, Request, StatusCode};
 use lifeline_hub::anhang::{init_scan_config, ScanConfig};
 use tower::ServiceExt;
 
-mod common;
+use crate::common;
 use common::{anfrage, login_cookie, setup};
 
 /// PNG-Magic-Bytes genügen: Größe und Typ sind in Ordnung, erst der Scan scheitert.

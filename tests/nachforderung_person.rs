@@ -7,7 +7,7 @@
 use axum::http::StatusCode;
 use serde_json::Value;
 
-mod common;
+use crate::common;
 use common::*;
 
 fn nachforderungen(einsatz: i64) -> String {
