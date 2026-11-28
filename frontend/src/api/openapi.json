@@ -1155,7 +1155,8 @@
           "felder",
           "intervall_min_s",
           "intervall_vorschlag_s",
-          "http_im_lan"
+          "http_im_lan",
+          "zweck"
         ],
         "properties": {
           "bezeichnung": {
@@ -1187,6 +1188,10 @@
             "items": {
               "$ref": "#/components/schemas/Platz"
             }
+          },
+          "zweck": {
+            "$ref": "#/components/schemas/AdapterZweck",
+            "description": "Abruf oder Versand; eine Versand-Art hat kein bearbeitbares Intervall (LLH-2126)."
           }
         }
       },
@@ -1420,6 +1425,14 @@
           "braucht_eingriff",
           "aus",
           "art_unbekannt"
+        ]
+      },
+      "AdapterZweck": {
+        "type": "string",
+        "description": "Wozu eine Anbindung dient (LLH-2126). Eine Versand-Art (SMTP, Matrix, Fax) ruft nichts\nab: ihr Lauf prüft im festen Takt der Art nur die Verbindung, und die Verwaltung zeigt\nPrüfungen statt Abrufe.",
+        "enum": [
+          "abruf",
+          "versand"
         ]
       },
       "AdminAktion": {

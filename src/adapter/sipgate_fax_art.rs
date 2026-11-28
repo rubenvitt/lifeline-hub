@@ -10,7 +10,9 @@ use std::sync::Arc;
 use futures::future::BoxFuture;
 use serde_json::{Map, Value};
 
-use super::art::{AdapterArt, Fehlschlag, Feld, FeldTyp, OhneUebernahme, Platz, Uebernahme};
+use super::art::{
+    AdapterArt, AdapterZweck, Fehlschlag, Feld, FeldTyp, OhneUebernahme, Platz, Uebernahme,
+};
 use super::sipgate::{self, SipgateFehler, SipgateZugang};
 use super::ziel::AbrufKontext;
 use super::zustand::AdapterFehler;
@@ -134,6 +136,9 @@ impl AdapterArt for SipgateFaxArt {
     }
     fn intervall_vorschlag_s(&self) -> i64 {
         3600
+    }
+    fn zweck(&self) -> AdapterZweck {
+        AdapterZweck::Versand
     }
 
     fn check_extra(&self, einstellungen: &Map<String, Value>) -> Result<(), String> {

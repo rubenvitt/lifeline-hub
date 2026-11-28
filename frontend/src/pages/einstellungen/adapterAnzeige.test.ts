@@ -7,6 +7,7 @@ import {
   einstellungenVon,
   einstellungsRegeln,
   hostWechsel,
+  isVersandArt,
   isZustandSichtbar,
 } from './adapterAnzeige';
 
@@ -159,5 +160,30 @@ describe('adapterFehlerText', () => {
     expect(adapterVersuchText({ erfolg: false, fehler_art: 'verbindung', probe: false })).toBe(
       'Keine Verbindung zum Ziel',
     );
+  });
+});
+
+/** LLH-2126: Versand-Arten sprechen von Prüfung. */
+describe('Versand-Art', () => {
+  it('erkennt die Versand-Art am Zweck, eine fehlende Art nicht', () => {
+    expect(isVersandArt({ zweck: 'versand' })).toBe(true);
+    expect(isVersandArt({ zweck: 'abruf' })).toBe(false);
+    expect(isVersandArt(undefined)).toBe(false);
+  });
+
+  it('nennt den Zustand „wartet“ je nach Zweck', () => {
+    expect(adapterZustandAnzeige({ zustand: 'wartet' }).wort).toBe('noch nie abgerufen');
+    expect(adapterZustandAnzeige({ zustand: 'wartet' }, true).wort).toBe('noch nicht geprüft');
+    expect(adapterZustandAnzeige({ zustand: 'gestoert' }, true).wort).toBe('gestört');
+  });
+
+  it('zeigt einen Versuch einer Versand-Art ohne Eintragszahl', () => {
+    const ok = { erfolg: true, anzahl: 0, probe: false } as const;
+    expect(adapterVersuchText(ok)).toBe('abgerufen · 0 Einträge');
+    expect(adapterVersuchText(ok, true)).toBe('erreichbar');
+    expect(adapterVersuchText({ ...ok, probe: true }, true)).toBe('erreichbar · Prüfung');
+    expect(
+      adapterVersuchText({ erfolg: false, fehler_art: 'zeitueberschreitung', probe: false }, true),
+    ).toBe('Keine Antwort in 20 s');
   });
 });

@@ -57,6 +57,7 @@ import {
   einstellungsRegeln,
   entferneAdapter,
   hostWechsel,
+  isVersandArt,
   speicherHinweisText,
   uebernimmAdapter,
   type HostWechsel,
@@ -94,7 +95,9 @@ export function adapterPatch(
   const patch: AdapterPatch = {};
   const name = String(nachher.name ?? '').trim();
   if (name !== vorher.name) patch.name = name;
-  if (nachher.intervall_s !== vorher.intervall_s) patch.intervall_s = nachher.intervall_s;
+  // Eine Versand-Art prüft im festen Takt der Art; ihr Intervall ist nicht bearbeitbar (LLH-2126).
+  if (!isVersandArt(art) && nachher.intervall_s !== vorher.intervall_s)
+    patch.intervall_s = nachher.intervall_s;
   if (art) {
     const von = (w: Werte) =>
       einstellungenVon(
@@ -236,7 +239,8 @@ export default function AdapterAnsicht() {
   const darfSchreiben = isAdmin && gesperrt == null;
   const grund = !isAdmin ? NUR_ADMIN : gesperrt != null ? 'am Hub anbinden' : undefined;
   const zeit = (w: string) => zeitKurz(w, konv);
-  const zustand = adapterZustandAnzeige(adapter);
+  const versand = isVersandArt(art);
+  const zustand = adapterZustandAnzeige(adapter, versand);
   // „Art unbekannt“ überdeckt „angehalten“ im Zustand; der Zeitpunkt sagt es trotzdem.
   const angehalten =
     adapter.angehalten_at != null ||
@@ -295,13 +299,19 @@ export default function AdapterAnsicht() {
         { max: ADAPTER_NAME_MAX, message: `Höchstens ${ADAPTER_NAME_MAX} Zeichen` },
       ],
     },
-    {
-      name: 'intervall_s',
-      label: 'Intervall',
-      anzeige: <span style={monoStil('mono')}>{`${adapter.intervall_s} s`}</span>,
-      eingabe: <ZahlFeld min={art?.intervall_min_s ?? 1} max={INTERVALL_MAX_S} ganz einheit="s" />,
-      regeln: [pflicht('Intervall')],
-    },
+    ...(versand
+      ? []
+      : [
+          {
+            name: 'intervall_s',
+            label: 'Intervall',
+            anzeige: <span style={monoStil('mono')}>{`${adapter.intervall_s} s`}</span>,
+            eingabe: (
+              <ZahlFeld min={art?.intervall_min_s ?? 1} max={INTERVALL_MAX_S} ganz einheit="s" />
+            ),
+            regeln: [pflicht('Intervall')],
+          },
+        ]),
     ...(zeigtEinstellungen && art
       ? art.felder.map((f): BearbeitbaresFeld<Werte> => ({
           name: feldName(f.name),
@@ -421,11 +431,11 @@ export default function AdapterAnsicht() {
                   <Status
                     groesse="klein"
                     ton={pruefErgebnis.erfolg ? 'normal' : 'achtung'}
-                    wort={`Verbindung prüfen: ${adapterVersuchText({ ...pruefErgebnis, probe: false }).replace(/^abgerufen/, 'erreichbar')}`}
+                    wort={`Verbindung prüfen: ${adapterVersuchText({ ...pruefErgebnis, probe: false }, versand).replace(/^abgerufen/, 'erreichbar')}`}
                   />
                   <span style={{ ...schriftStil('textKlein'), color: rollen.gedaempft }}>
                     <span style={monoStil('monoKlein')}>{`${pruefErgebnis.dauer_ms} ms`}</span>
-                    {' · nichts übernommen'}
+                    {versand ? null : ' · nichts übernommen'}
                   </span>
                 </Stapel>
               </div>
@@ -447,11 +457,11 @@ export default function AdapterAnsicht() {
                 </span>
               </Stapel>
             </Datenfeld>
-            <Datenfeld label="Zuletzt erfolgreich">
+            <Datenfeld label={versand ? 'Zuletzt geprüft' : 'Zuletzt erfolgreich'}>
               {adapter.letzter_erfolg_at ? (
                 <Stapel abstand="xxs">
                   <span style={monoStil('mono')}>{zeit(adapter.letzter_erfolg_at)}</span>
-                  {adapter.letzte_anzahl != null && (
+                  {adapter.letzte_anzahl != null && !versand && (
                     <span style={{ color: rollen.gedaempft }}>
                       {adapter.letzte_anzahl === 1
                         ? '1 Eintrag'
@@ -477,7 +487,7 @@ export default function AdapterAnsicht() {
                 'keiner'
               )}
             </Datenfeld>
-            <Datenfeld label="Nächster Versuch">
+            <Datenfeld label={versand ? 'Nächste Prüfung' : 'Nächster Versuch'}>
               {art == null ? (
                 'ruft nicht ab'
               ) : angehalten ? (
@@ -580,7 +590,7 @@ export default function AdapterAnsicht() {
           </Stapel>
         </Paneel>
 
-        <Verlauf versuche={versucheQ} zeit={zeit} />
+        <Verlauf versuche={versucheQ} zeit={zeit} versand={versand} />
       </Stapel>
 
       <Modal
@@ -655,19 +665,24 @@ export default function AdapterAnsicht() {
   );
 }
 
-/** Paneel „Letzte Versuche“: Abrufe und Prüfungen, neueste zuerst, ohne Rumpf der Antwort. */
+/**
+ * Paneel „Letzte Versuche“: Abrufe und Prüfungen, neueste zuerst, ohne Rumpf der Antwort. Bei
+ * einer Versand-Art „Letzte Prüfungen“, denn ihr Lauf prüft nur die Verbindung (LLH-2126).
+ */
 function Verlauf({
   versuche: q,
   zeit,
+  versand,
 }: {
   versuche: ReturnType<typeof useQuery<Awaited<ReturnType<typeof loadAdapterVersuche>>>>;
   zeit: (w: string) => string;
+  versand: boolean;
 }) {
   const { rollen } = useRollen();
   const versuche = q.data ?? [];
   return (
     <Paneel
-      titel="Letzte Versuche"
+      titel={versand ? 'Letzte Prüfungen' : 'Letzte Versuche'}
       meta={q.data ? `${versuche.length} von höchstens 50` : undefined}
     >
       {q.isError && (
@@ -692,7 +707,9 @@ function Verlauf({
         )
       ) : versuche.length === 0 ? (
         <PaneelZeile>
-          <span style={{ color: rollen.gedaempft }}>Noch kein Abruf.</span>
+          <span style={{ color: rollen.gedaempft }}>
+            {versand ? 'Noch keine Prüfung.' : 'Noch kein Abruf.'}
+          </span>
         </PaneelZeile>
       ) : (
         versuche.map((v, i) => (
@@ -701,7 +718,7 @@ function Verlauf({
               <Stapel richtung="zeile" umbruch abstand="md" ausrichten="baseline">
                 <span style={monoStil('monoKlein')}>{zeit(v.at)}</span>
                 <span style={{ color: v.erfolg ? rollen.text : rollen.achtungText }}>
-                  {adapterVersuchText(v)}
+                  {adapterVersuchText(v, versand)}
                 </span>
                 <span
                   style={{ ...monoStil('monoKlein'), color: rollen.gedaempft }}

@@ -18,7 +18,47 @@ export const BEISPIEL_ART: AdapterArtAnzeige = {
   intervall_min_s: 30,
   intervall_vorschlag_s: 60,
   http_im_lan: false,
+  zweck: 'abruf',
 };
+
+/** Eine Versand-Art (LLH-2126): prüft im festen Takt nur die Verbindung. */
+export const SMTP_ART: AdapterArtAnzeige = {
+  code: 'smtp',
+  bezeichnung: 'E-Mail (SMTP)',
+  felder: [
+    { name: 'host', bezeichnung: 'Server', typ: 'host', pflicht: true, max: 253 },
+    { name: 'absender', bezeichnung: 'Absenderadresse', typ: 'text', pflicht: true, max: 254 },
+  ],
+  plaetze: [{ name: 'passwort', bezeichnung: 'Passwort', pflicht: false }],
+  intervall_min_s: 900,
+  intervall_vorschlag_s: 3600,
+  http_im_lan: false,
+  zweck: 'versand',
+};
+
+/** Eine SMTP-Anbindung zu {@link SMTP_ART}. */
+export function smtpAdapterFixture(
+  id: string,
+  extra: Partial<AdapterAnzeige> = {},
+): AdapterAnzeige {
+  return adapterFixture(id, {
+    art: 'smtp',
+    art_bezeichnung: 'E-Mail (SMTP)',
+    einstellungen: { host: 'mail.example.org', absender: 'einsatz@example.org' } as never,
+    intervall_s: 3600,
+    letzte_anzahl: 0,
+    geheimnisse: [
+      {
+        name: 'passwort',
+        bezeichnung: 'Passwort',
+        pflicht: false,
+        is_gesetzt: true,
+        is_unlesbar: false,
+      },
+    ],
+    ...extra,
+  });
+}
 
 export function adapterFixture(id: string, extra: Partial<AdapterAnzeige> = {}): AdapterAnzeige {
   return {

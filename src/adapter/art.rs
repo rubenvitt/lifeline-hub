@@ -69,6 +69,19 @@ wire_enum! {
     }
 }
 
+wire_enum! {
+    /// Wozu eine Anbindung dient (LLH-2126). Eine Versand-Art (SMTP, Matrix, Fax) ruft nichts
+    /// ab: ihr Lauf prüft im festen Takt der Art nur die Verbindung, und die Verwaltung zeigt
+    /// Prüfungen statt Abrufe.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+    pub enum AdapterZweck {
+        /// Holt Daten aus dem Fremdsystem und übernimmt sie.
+        Abruf => "abruf",
+        /// Trägt einen Kanal des Ausgangs; der Lauf prüft nur die Verbindung.
+        Versand => "versand",
+    }
+}
+
 /// Ein Einstellungsfeld der Art. Nichts Geheimes: das gehört in einen [`Platz`].
 #[derive(Debug, Clone, Copy, Serialize, ToSchema)]
 pub struct Feld {
@@ -142,6 +155,12 @@ pub trait AdapterArt: Send + Sync + 'static {
     fn intervall_min_s(&self) -> i64;
     /// Vorschlag beim Anlegen.
     fn intervall_vorschlag_s(&self) -> i64;
+
+    /// Wozu die Art dient. Bei `Versand` gilt immer [`Self::intervall_vorschlag_s`]
+    /// (`routes::adapter`, LLH-2126).
+    fn zweck(&self) -> AdapterZweck {
+        AdapterZweck::Abruf
+    }
 
     /// Ob die Art flüchtige Daten liefert: ihre Übernahme geht nur in den Speicher, der Takt
     /// zählt ab Laufbeginn, und eine Versuchszeile steht nur bei Zustandswechsel
@@ -359,6 +378,8 @@ pub struct AdapterArtAnzeige {
     pub intervall_vorschlag_s: i64,
     /// Die Art darf `http` zu einem privaten IP-Literal mit LAN-Ausnahme rufen (ADR-0105).
     pub http_im_lan: bool,
+    /// Abruf oder Versand; eine Versand-Art hat kein bearbeitbares Intervall (LLH-2126).
+    pub zweck: AdapterZweck,
 }
 
 impl AdapterArtAnzeige {
@@ -376,6 +397,7 @@ impl AdapterArtAnzeige {
             intervall_min_s: art.intervall_min_s(),
             intervall_vorschlag_s: art.intervall_vorschlag_s(),
             http_im_lan: art.http_im_lan(),
+            zweck: art.zweck(),
         }
     }
 }
@@ -647,5 +669,26 @@ mod tests {
         assert!(produktiv.find("smtp").is_some());
         assert!(produktiv.find("matrix").is_some());
         assert!(produktiv.find("sipgate_fax").is_some());
+    }
+
+    #[test]
+    fn versand_arten_melden_zweck_versand_und_abruf_arten_abruf() {
+        let produktiv =
+            Verzeichnis::produktiv(Arc::new(crate::drohne::Store::new()), Default::default());
+        for code in ["smtp", "matrix", "sipgate_fax"] {
+            assert_eq!(
+                produktiv.find(code).unwrap().zweck(),
+                AdapterZweck::Versand,
+                "{code}"
+            );
+        }
+        for code in ["stammdaten_abruf", "suchlage"] {
+            assert_eq!(
+                produktiv.find(code).unwrap().zweck(),
+                AdapterZweck::Abruf,
+                "{code}"
+            );
+        }
+        assert_eq!(Probe.zweck(), AdapterZweck::Abruf);
     }
 }

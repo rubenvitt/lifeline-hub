@@ -507,6 +507,8 @@ export interface components {
             /** Format: int64 */
             intervall_vorschlag_s: number;
             plaetze: components["schemas"]["Platz"][];
+            /** @description Abruf oder Versand; eine Versand-Art hat kein bearbeitbares Intervall (LLH-2126). */
+            zweck: components["schemas"]["AdapterZweck"];
         };
         /**
          * @description Warum ein Abruf scheiterte oder ein Adapter angehalten ist. Ein Code, nie Text des Ziels.
@@ -574,6 +576,13 @@ export interface components {
          * @enum {string}
          */
         AdapterZustand: "wartet" | "ok" | "gestoert" | "braucht_eingriff" | "aus" | "art_unbekannt";
+        /**
+         * @description Wozu eine Anbindung dient (LLH-2126). Eine Versand-Art (SMTP, Matrix, Fax) ruft nichts
+         *     ab: ihr Lauf prüft im festen Takt der Art nur die Verbindung, und die Verwaltung zeigt
+         *     Prüfungen statt Abrufe.
+         * @enum {string}
+         */
+        AdapterZweck: "abruf" | "versand";
         /**
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
          *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
