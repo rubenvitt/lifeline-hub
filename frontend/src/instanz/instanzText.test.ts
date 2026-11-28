@@ -6,7 +6,7 @@ import {
   gefundenZeile,
   iosPushHubBandText,
   iosPushHubBandTitel,
-  kopplungHinweise,
+  kopplungHinweise as kopplungHinweiseMit,
   kopplungZustandZeile,
   richtungText,
   schluesselZeile,
@@ -15,6 +15,13 @@ import {
   zertifikatWarnt,
   zertifikatZeile,
 } from './instanzText';
+
+// `zeit` ist Pflicht (LLH-2086), damit die Seite sie nicht vergessen kann; hier zeigt sie den Rohwert.
+const kopplungHinweise = (
+  k: InstanzKopplungAnzeige,
+  datentraegerBestaetigt = true,
+  zeit: (wert: string) => string = (wert) => wert,
+) => kopplungHinweiseMit(k, datentraegerBestaetigt, zeit);
 
 const kopplung = (teil: Partial<InstanzKopplungAnzeige> = {}): InstanzKopplungAnzeige => ({
   id: 1,

@@ -75,4 +75,24 @@ describe('IosPushHubBand (LLH-2074)', () => {
       screen.getByText('iOS-Push über den Hub „Hub Süd“ wird nicht zugestellt'),
     ).toBeInTheDocument();
   });
+
+  // LLH-2086: Der Hub-Name ist nicht eindeutig; zwei gleichnamige Hubs ergeben zwei Bänder ohne
+  // doppelten React-Key.
+  it('zwei gleichnamige Hubs ergeben zwei Bänder ohne doppelten Key', () => {
+    const fehler = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      renderMitProviders(
+        <IosPushHubBand
+          einsatz={einsatz('einsatzleitung', [NORD, { ...NORD, since: '2026-11-23 09:00:00' }])}
+        />,
+      );
+      expect(screen.getAllByText(TITEL)).toHaveLength(2);
+      const keyWarnung = fehler.mock.calls.filter((c) =>
+        c.some((a) => typeof a === 'string' && a.includes('same key')),
+      );
+      expect(keyWarnung).toEqual([]);
+    } finally {
+      fehler.mockRestore();
+    }
+  });
 });

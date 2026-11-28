@@ -20,9 +20,11 @@ export default function IosPushHubBand({ einsatz }: { einsatz: EinsatzAnzeige })
   if (sperren.length === 0 || !darfFuehrungBedienen(einsatz, benutzer)) return null;
   return (
     <div data-lfh="ios-push-hub-band">
-      {sperren.map((s) => (
+      {/* Der Hub-Name ist nicht eindeutig (LLH-2086); das Band hat keinen Zustand, den eine
+          neue Reihenfolge verschieben könnte, deshalb genügt der Index im Key. */}
+      {sperren.map((s, i) => (
         <Alert
-          key={s.hub_name}
+          key={`${s.hub_name}-${i}`}
           type="warning"
           showIcon
           banner

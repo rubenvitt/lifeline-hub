@@ -67,11 +67,12 @@ export function stammdatenZeile(k: InstanzKopplungAnzeige): string | null {
 }
 
 /** Hinweise, die an einer Kopplung stehen müssen; leer, wenn alles passt. `datentraegerBestaetigt`
- *  sagt, ob diese Instanz ihre Datenträgerverschlüsselung bestätigt hat (LLH-1493). */
+ *  sagt, ob diese Instanz ihre Datenträgerverschlüsselung bestätigt hat (LLH-1493). `zeit` ist
+ *  Pflicht (LLH-2086): ein Vorgabewert zeigte rohes UTC, und kein Test bemerkte ihn (ADR-0012). */
 export function kopplungHinweise(
   k: InstanzKopplungAnzeige,
-  datentraegerBestaetigt = true,
-  zeit: (wert: string) => string = (wert) => wert,
+  datentraegerBestaetigt: boolean,
+  zeit: (wert: string) => string,
 ): string[] {
   const aus: string[] = [];
   const aktiv = k.zustand === 'aktiv' && k.org.widerrufen_at == null;
