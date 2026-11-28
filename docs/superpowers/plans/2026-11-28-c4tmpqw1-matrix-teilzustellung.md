@@ -69,5 +69,5 @@ Zunder: https://zunder.rubeen.dev/#/aufgabe/c4tmpqw1xj8j0ig7es6qfek0
 
 ### Task 3: Abschluss
 
-- [ ] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
-- [ ] Bild der Versandliste (Wegwerf-Spec oder Vitest-Render) für PR und Meldung.
+- [x] `./scripts/check-all.sh --geaendert --ohne-e2e` grün.
+- [x] Bild der Versandliste (Wegwerf-Spec oder Vitest-Render) für PR und Meldung.
