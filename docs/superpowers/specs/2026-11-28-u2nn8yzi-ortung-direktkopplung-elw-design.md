@@ -34,7 +34,9 @@ Position kommt im Takt des Abgleichs an, egal welche Seite ruft.
   gerufen, einen Takt später (≈ 10 s).
 - Am Fahrzeug gelten dieselben Regeln wie bei LLH-2119: Baustein, Vorrang, Drossel 15 s,
   Org-Schalter, Ende, kein Nachlauf.
-- Der Spiegel am liefernden ELW sieht die Position über den bestehenden Spiegel.
+- Der Spiegel am liefernden ELW sieht die Position über den bestehenden Spiegel, einen Abgleich
+  nach dem Fahrzeug am Führer (wie bei LLH-2119: geliefert wird in der Transaktion, übernommen
+  danach).
 
 ## Nicht-Ziele
 
@@ -112,7 +114,9 @@ Je Kopplung und Paketrichtung:
 
 1. Gerufenes ELW (Führer) legt in seine Antwort Anfragen für seine Fern-Kopplungen an diese
    Kopplung (`build_requests`), außerhalb der Schreibtransaktion, nach dem Commit, wie
-   `answer_hub` heute.
+   `answer_hub` heute. Sie bekommen nur den Restplatz bis `SPIEGEL_MAX` und werden wie in `passt`
+   gekürzt; Lieferungen behalten Vorrang (meine Wahl nach der Gegenlese: der Abgleich darf nie an
+   der Ortung scheitern, fehlende Anfragen kommen im nächsten Takt).
 2. Rufendes ELW (Lieferant) übernimmt die Antwort und merkt sich die Anfragen im Speicher
    (**Anfragepuffer** je Kopplung, s. u.).
 3. Beim nächsten Abgleich legt es die Antworten (`answer_…`) in die erste Runde seiner Anfrage.
@@ -157,7 +161,19 @@ zusätzlichen Aufruf und fasst die Rundenlogik (`RUNDEN_MAX`) an.
    Logik wie heute beim Hub (`PUFFER_FRISCH` 10 s, `PUFFER_VERFALL` 60 s).
 
 `pending` ist wahr, solange eine Fernquelle nicht frisch ist. Einträge, die schon da sind, zeigt
-die Liste trotzdem.
+die Liste trotzdem, und sie sind wählbar.
+
+**Partner, der nicht antwortet** (Gegenlese; meine Wahl): Ein Partner mit Stand LLH-2119 oder
+älter beantwortet Wünsche nie. Statt einer neuen Protokollversion wird das je Quelle
+hingenommen:
+- Ein Lieferant mit neuem Stand antwortet auf **jeden** Wunsch einer abgebildeten Org mit einem
+  Eintrag, auch leer oder mit `tracking_enabled = false`. So ist „antwortet nicht“ eindeutig ein
+  älterer oder unerreichbarer Partner.
+- Die Antwort nennt je Fernquelle, ob sie aussteht (`pending_sources: Vec<i64>` mit den
+  `via_coupling_id`, zusätzlich zu `pending`). Der Dialog zeigt nach 15 s „<Name> antwortet gerade
+  nicht“ nur für diese Quelle; die übrigen Kennungen bleiben wählbar.
+- Ein dauerhaft stummer Partner kostet also bei jedem Öffnen eine Ladezeile, sperrt aber nichts.
+  Wird das lästig, kommt eine Protokollversion als Folgeaufgabe.
 
 `TrackingCandidate` bekommt zwei Felder dazu (additiv, englisch wie der Typ):
 
@@ -166,9 +182,11 @@ die Liste trotzdem.
 
 `via_hub` bleibt (wahr bei der Hub-Quelle), damit nichts bricht; der Dialog liest künftig `via`.
 `coupled` bestimmt das führende ELW aus seinen Fern-Zeilen dieser Kopplung (wie heute beim Hub).
-`tracking_enabled` ist der eigene Schalter, beim Hub zusätzlich der des Hubs (wie heute). Liefert
-ein Partner-ELW `tracking_enabled = false`, kommen von ihm keine Einträge; der Dialog sagt dazu
-nichts eigens (meine Wahl: die Kennungen fehlen schlicht, wie bei einem ELW ohne Geräte).
+`tracking_enabled` ist künftig nur der **eigene** Schalter (er sperrt den Dialog wie heute).
+Der Schalter einer Fernquelle, Hub wie Partner-ELW, blendet nur deren Einträge aus (meine Wahl
+nach der Gegenlese, gleiche Regel für alle Quellen). Heute sperrt ein ausgeschalteter Hub den
+ganzen Dialog; mit nur einer Quelle sieht das für den Bediener fast gleich aus („keine
+Kennungen“), mit Partnern blieben sonst deren Kennungen grundlos gesperrt.
 
 Wird das führende ELW gerufen, nützt `takt::wecken` nichts; der Wunsch geht mit der nächsten
 Antwort hinaus, die Liste kommt einen Takt später (≤ 10 s bei aktivem Einsatz, unter den 15 s
@@ -189,9 +207,10 @@ Geduld des Dialogs).
 Zeile, egal welcher Art: nichts zu tun.
 
 **Rückgängig nach Entlassen** (`disposition_repo.rs`, heute `hub_kopplung_fuer_org`): Die
-Wiederherstellung prüft künftig nur, dass die gespeicherte `instanz_kopplung_id` aktiv ist und die
-Org über sie abgebildet ist, egal welcher Art (Hilfsfunktion etwa
-`repo::is_org_abgebildet_aktiv`). Ohne Pufferprüfung, wie bei LLH-2119.
+Wiederherstellung prüft dieselbe Regel wie `PUT` mit `via_coupling_id`: die gespeicherte
+`instanz_kopplung_id` ist aktiv, die Org ist über sie abgebildet, und sie ist der Hub der Org
+(`standard`, `meldet_sich`) oder eine Direktkopplung (`vor_ort`). Eine gemeinsame Hilfsfunktion
+trägt die Regel für beide Stellen. Ohne Pufferprüfung, wie bei LLH-2119.
 
 **Benennung:** „Hub-Kopplung“ heißt im Code, wo er angefasst wird, „Fern-Kopplung“
 (`KopplungZugang::Hub` → `Fern`, Kommentare). Die Umbenennung kommt als eigener
@@ -242,9 +261,9 @@ Org über sie abgebildet ist, egal welcher Art (Hilfsfunktion etwa
 
 - **Zwei ELW mit `vor_ort`-Kopplung**, Muster der Spiegeltests von LLH-2119:
   - Rufendes ELW führt, gerufenes hält Zugang und Position: nach einem Abgleich steht die Position
-    am Fahrzeug des Führers (Quelle `einwurf`) und am Spiegel.
-  - Gerufenes ELW führt, rufendes hält Zugang und Position: nach zwei Abgleichen ebenso; nach
-    einem noch nicht.
+    am Fahrzeug des Führers (Quelle `einwurf`), nach zwei am Spiegel.
+  - Gerufenes ELW führt, rufendes hält Zugang und Position: nach zwei Abgleichen am Fahrzeug des
+    Führers, nach einem noch nicht; nach drei am Spiegel.
 - Kandidaten in beiden Lagen: Wunsch → Liste im Puffer, ohne Koordinaten; `via` und
   `via_coupling_id` gesetzt; eigene Ablage zusätzlich in der Liste.
 - Geliefert wird nichts für: nicht angefragte Kennung, nicht abgebildete Org, widerrufenen oder
@@ -254,15 +273,26 @@ Org über sie abgebildet ist, egal welcher Art (Hilfsfunktion etwa
   Einwurf); ELW A fragt dieselbe Kennung an und bekommt nichts.
 - Über `standard` bleibt alles wie LLH-2119: der Hub legt keine Anfragen in die Antwort, das ELW
   beantwortet keine.
+- Ein Lieferant mit neuem Stand antwortet auf jeden Wunsch einer abgebildeten Org mit einem
+  Eintrag; ein stummer Partner steht in `pending_sources`, die übrigen Quellen sind wählbar.
+- Ausgeschalteter Schalter einer Fernquelle blendet nur deren Einträge aus.
+- Anfragen des gerufenen Führers in einer fast vollen Antwort werden gekürzt, der Abgleich läuft.
 - Anfragepuffer verfällt: Anfragen älter als 30 s werden nicht beantwortet.
 - Ein Partner mit Stand LLH-2119 (Felder da, Gegenrichtung ungenutzt): Abgleich läuft, nichts
   kommt an.
 - `PUT` mit `via_coupling_id` einer fremden, nicht aktiven oder nicht abgebildeten Kopplung: 422;
   Kennung nicht im Puffer: 422; doppelt: 409.
-- Rückgängig nach Entlassen stellt eine Fern-Kopplung über `vor_ort` wieder her.
+- Rückgängig nach Entlassen stellt eine Fern-Kopplung über `vor_ort` wieder her, nicht aber über
+  eine Standardkopplung, an der diese Instanz der Hub ist.
 - Führungsabgabe am führenden ELW beendet die Fern-Kopplung ohne ETB-Eintrag (bestehender Test,
   mit `vor_ort` parametrisieren, wo billig).
 - Frontend: Dialog zeigt „über <Name>“, schickt `via_coupling_id`, Lade- und Zeitüberschreitungstext.
+
+## Nach der Gegenlese
+
+Ein Gegenleser hat den Entwurf als Bauender gegen den Code gelesen. Seine Punkte sind oben
+eingearbeitet und als „meine Wahl“ markiert: Umgang mit einem stummen Partner, Schalter je
+Quelle, gekürzte Anfragen, Rücknahme mit der Regel von `PUT`, Zählung der Abgleiche am Spiegel.
 
 ## Dem Bauenden überlassen
 
