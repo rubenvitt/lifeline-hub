@@ -93,6 +93,7 @@ export const SCOPE_TEXT: Record<Scope, string> = {
   'alarmmeldungen:write': 'Alarmmeldungen einliefern',
   'positionen:write': 'Positionen einliefern',
   'rechner:use': 'Rechner nutzen',
+  'meldungen:write': 'Meldungen einreichen (als unverifizierte Vorschläge)',
 };
 
 export const SCOPES = Object.keys(SCOPE_TEXT) as Scope[];

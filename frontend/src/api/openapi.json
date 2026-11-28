@@ -21683,7 +21683,8 @@
           "events:read",
           "alarmmeldungen:write",
           "positionen:write",
-          "rechner:use"
+          "rechner:use",
+          "meldungen:write"
         ]
       },
       "ShellInfo": {

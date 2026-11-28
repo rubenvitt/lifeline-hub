@@ -8637,7 +8637,7 @@ export interface components {
          *     Zugriffsart englisch. Neue Werte kommen nur hinzu (Stabilitätszusage v1).
          * @enum {string}
          */
-        Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use";
+        Scope: "lage:read" | "einsaetze:read" | "events:read" | "alarmmeldungen:write" | "positionen:write" | "rechner:use" | "meldungen:write";
         /** @description Antwort von `GET /api/shell`. Felder kommen nur hinzu (Spec `huellen-vertrag`). */
         ShellInfo: {
             /**

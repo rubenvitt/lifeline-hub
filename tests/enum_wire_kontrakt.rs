@@ -751,6 +751,7 @@ fn serde_wire_gleich_as_str() {
         AlarmmeldungenWrite => "alarmmeldungen:write",
         PositionenWrite => "positionen:write",
         RechnerUse => "rechner:use",
+        MeldungenWrite => "meldungen:write",
     });
     enum_wire!(lifeline_hub::public_api::scope::ZugangZustand {
         Wartet => "wartet",

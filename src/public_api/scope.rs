@@ -15,20 +15,32 @@ wire_enum! {
         AlarmmeldungenWrite => "alarmmeldungen:write",
         PositionenWrite => "positionen:write",
         RechnerUse => "rechner:use",
+        /// Meldungen als unverifizierte Vorschläge einreichen (Route `POST /api/v1/report-suggestions`).
+        MeldungenWrite => "meldungen:write",
     }
 }
 
 impl Scope {
-    /// Lese-Scope mit Einsatzbezug: Er sieht nur den Einsatz, den die Einsatzleitung für den
-    /// Zugang freigegeben hat (`super::freigabe`, ADR-0035). Ein neuer solcher Scope kommt hier
+    /// Scope mit Einsatzbezug: Er wirkt nur auf den Einsatz, den die Einsatzleitung für den
+    /// Zugang freigegeben hat (`super::freigabe`, ADR-0035); ein Lese-Scope sieht nur ihn, ein
+    /// Schreib-Scope (`meldungen:write`) reicht nur dafür ein. Ein neuer solcher Scope kommt hier
     /// dazu, sobald seine Route steht; vorher zeigte das Paneel „Anbindungen“ einen Schalter
     /// ohne Wirkung.
     ///
     /// `events:read` gehört nicht dazu: allein öffnet es keine Ereignisart
     /// (`super::events::EventType::scope`), ein Schalter hätte keine Folge (LLH-1655).
     pub fn has_einsatzbezug(self) -> bool {
-        matches!(self, Scope::LageRead | Scope::EinsaetzeRead)
+        matches!(
+            self,
+            Scope::LageRead | Scope::EinsaetzeRead | Scope::MeldungenWrite
+        )
     }
+}
+
+/// Hat der Zugang genau den Scope `meldungen:write` und keinen weiteren? Nur ein solcher Zugang
+/// darf an einer gekoppelten Instanz angelegt, angenommen und freigegeben werden.
+pub fn is_nur_meldungen(scopes: &[Scope]) -> bool {
+    scopes == [Scope::MeldungenWrite]
 }
 
 wire_enum! {
@@ -121,13 +133,20 @@ mod tests {
     }
 
     #[test]
-    fn lage_und_einsaetze_lesen_haben_einsatzbezug() {
+    fn scopes_mit_einsatzbezug() {
         let mit: Vec<&str> = Scope::ALLE
             .iter()
             .filter(|s| s.has_einsatzbezug())
             .map(|s| s.as_str())
             .collect();
-        assert_eq!(mit, ["lage:read", "einsaetze:read"]);
+        assert_eq!(mit, ["lage:read", "einsaetze:read", "meldungen:write"]);
+    }
+
+    #[test]
+    fn nur_meldungen_ist_genau_der_eine_scope() {
+        assert!(is_nur_meldungen(&[Scope::MeldungenWrite]));
+        assert!(!is_nur_meldungen(&[]));
+        assert!(!is_nur_meldungen(&[Scope::MeldungenWrite, Scope::LageRead]));
     }
 
     /// Jede Ereignisart hängt an einem Scope mit Einsatzbezug; `events:read` allein macht einen
