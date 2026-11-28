@@ -1,7 +1,7 @@
 {
   "name": "lifeline-hub-frontend",
   "private": true,
-  "version": "1.0.0-alpha.201",
+  "version": "1.0.0-alpha.202",
   "type": "module",
   "packageManager": "pnpm@11.10.0",
   "engines": {
