@@ -417,8 +417,44 @@ async fn hub_ohne_ios_push_meldet_keine_sperre() {
     assert_eq!(sperre_am_elw(&elw.i).await, None);
 }
 
+/// Ein Lage-Snapshot friert die Sperre nicht ein (LLH-2086): sie ist ein Zustand der Kopplung,
+/// kein Teil des Lagebilds, wie die Führung je Einsatz.
+#[tokio::test]
+async fn lage_snapshot_friert_die_sperre_des_hubs_nicht_ein() {
+    let w = welt_mit((false, true), (false, false)).await;
+    hub_sperren(&w.hub.i).await;
+    melden(&w.elw.i).await;
+    let elw = &w.elw.i;
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "GET",
+        &format!("/api/incidents/{}", w.einsatz),
+        &elw.admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+    assert!(v["ios_push_hub_gesperrt"].is_array(), "Vorbedingung: {v}");
+    let (s, v) = common::anfrage_json(
+        &elw.app,
+        "POST",
+        &format!("/api/incidents/{}/situation-snapshots", w.einsatz),
+        &elw.admin,
+        Some(&json!({"bezeichnung": "Stand 1"})),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    let daten: String = eine(&elw.pool, "SELECT daten FROM lage_snapshot").await;
+    let daten: Value = serde_json::from_str(&daten).unwrap();
+    assert!(daten["einsatz"].is_object(), "{daten}");
+    assert!(
+        daten["einsatz"].get("ios_push_hub_gesperrt").is_none(),
+        "gespeicherter Stand: {daten}"
+    );
+}
+
 /// Der ELW zeigt die Sperre am gelieferten Einsatz (Detail und Liste gleich) und an der
-/// Kopplung; der Spiegel am Hub zeigt nichts. Fällt die Sperre, fällt die Anzeige.
+/// Kopplung; ein Spiegel zeigt nichts. Fällt die Sperre, fällt die Anzeige.
 #[tokio::test]
 async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
     let w = welt_mit((false, true), (false, false)).await;
@@ -457,19 +493,26 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
         u["kopplungen"][0]["gegenueber_ios_push_gesperrt_seit"],
         json!(SPERRE_SEIT)
     );
-    let hub = &w.hub.i;
-    let (_, spiegel) = common::anfrage_json(
-        &hub.app,
+    // Ein Spiegel zeigt die Sperre nie (`e.spiegel = 0` in der Spalte): Hinweise eines Spiegels
+    // reisen nicht über diese Kopplung. Am Hub prüfte das nichts, denn dort ist die Kopplung
+    // `wird_gemeldet` (LLH-2086); deshalb derselbe Einsatz am ELW, kurz als Spiegel markiert.
+    let als_spiegel = |wert: i64| format!("UPDATE einsatz SET spiegel = {wert} WHERE id = {}", w.einsatz);
+    exec(&elw.pool, &als_spiegel(1)).await;
+    let (s, spiegel) = common::anfrage_json(
+        &elw.app,
         "GET",
-        &format!("/api/incidents/{}", w.spiegel),
-        &hub.admin,
+        &format!("/api/incidents/{}", w.einsatz),
+        &elw.admin,
         None,
     )
     .await;
+    assert_eq!(s, StatusCode::OK, "{spiegel}");
     assert!(
         spiegel.get("ios_push_hub_gesperrt").is_none(),
-        "Spiegel am Hub: {spiegel}"
+        "Spiegel am ELW: {spiegel}"
     );
+    exec(&elw.pool, &als_spiegel(0)).await;
+    let hub = &w.hub.i;
     exec(&hub.pool, "UPDATE ios_push_relais SET gesperrt_at = NULL").await;
     melden(elw).await;
     let (_, v) = common::anfrage_json(
