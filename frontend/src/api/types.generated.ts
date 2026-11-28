@@ -10805,6 +10805,8 @@ export interface components {
          *     - `maschinenzugang_webhook_*` (LLH-1656): `zugang_id` und `host` des Ziels, nie der Pfad.
          *     - `adapter_*` (LLH-2017): `adapter_id`, `adapter_art`, bei `_geheimnis_*` der `platz`, bei
          *       einer URL in den Einstellungen ihr `host`. Nie ein Geheimnis, nie ein Pfad.
+         *     - `*_frist_geaendert` (LLH-2140): `tage_vorher` und `tage`; ein fehlendes Feld heißt
+         *       „keine Frist“ (vorher keine gesetzt bzw. geleert).
          */
         ZugangsAngaben: {
             /** @description Adapter: Code seiner Art. */
