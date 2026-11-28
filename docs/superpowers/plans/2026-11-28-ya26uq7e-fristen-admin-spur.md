@@ -75,11 +75,11 @@
 - Consumes: Task 1 (Wire).
 - Produces: `export function fristText(a: ZugangsAngaben): string | undefined`.
 
-- [ ] **Step 1:** Typen erzeugen (`scripts/check-typ-codegen.sh --fix` bzw. wie das Skript es nennt); Typecheck bricht an `AKTION_TEXT`.
-- [ ] **Step 2: Failing tests** in `zugangsprotokollText.test.ts`: `AKTION_TEXT.skelett_frist_geaendert === 'Skelett-Frist geändert'` (und die beiden anderen); `fristText({tage:365}) === 'keine → 365 Tage'`, `fristText({tage_vorher:3650,tage:365}) === '3650 → 365 Tage'`, `fristText({tage_vorher:365}) === '365 Tage → keine'`, `fristText({tage_vorher:2,tage:1}) === '2 → 1 Tag'`, `fristText({tage:1}) === 'keine → 1 Tag'`, `fristText({}) === undefined`; `hasNamensziel('skelett_frist_geaendert') === false`.
-- [ ] **Step 3:** Texte und `fristText` umsetzen; in `AngabenAnzeige` `rollen ?? fristText(angaben) ?? instanzText(angaben) ?? leer`. Format: bei beiden Werten „A → B Tage“ (Einheit einmal am Ende, Einzahl nach B), sonst je Seite mit Einheit.
-- [ ] **Step 4:** `mise exec -- pnpm -C frontend exec vitest run src/zugangsprotokoll` und `pnpm -C frontend typecheck` → PASS.
-- [ ] **Step 5:** Doku-Eintrag in `zugangsprotokoll.md` (nach dem Ortungs-Eintrag), dann Commit.
+- [x] **Step 1:** Typen erzeugen (`scripts/check-typ-codegen.sh --fix` bzw. wie das Skript es nennt); Typecheck bricht an `AKTION_TEXT`.
+- [x] **Step 2: Failing tests** in `zugangsprotokollText.test.ts`: `AKTION_TEXT.skelett_frist_geaendert === 'Skelett-Frist geändert'` (und die beiden anderen); `fristText({tage:365}) === 'keine → 365 Tage'`, `fristText({tage_vorher:3650,tage:365}) === '3650 → 365 Tage'`, `fristText({tage_vorher:365}) === '365 Tage → keine'`, `fristText({tage_vorher:2,tage:1}) === '2 → 1 Tag'`, `fristText({tage:1}) === 'keine → 1 Tag'`, `fristText({}) === undefined`; `hasNamensziel('skelett_frist_geaendert') === false`.
+- [x] **Step 3:** Texte und `fristText` umsetzen; in `AngabenAnzeige` `rollen ?? fristText(angaben) ?? instanzText(angaben) ?? leer`. Format: bei beiden Werten „A → B Tage“ (Einheit einmal am Ende, Einzahl nach B), sonst je Seite mit Einheit.
+- [x] **Step 4:** `mise exec -- pnpm -C frontend exec vitest run src/zugangsprotokoll` und `pnpm -C frontend typecheck` → PASS.
+- [x] **Step 5:** Doku-Eintrag in `zugangsprotokoll.md` (nach dem Ortungs-Eintrag), dann Commit.
 
 ### Task 4: Gate
 

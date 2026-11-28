@@ -3,6 +3,7 @@ import {
   AKTION_TEXT,
   ANMELDEWEG_TEXT,
   anmeldewegText,
+  fristText,
   hasNamensziel,
   instanzText,
   rollenText,
@@ -213,5 +214,32 @@ describe('Ortung im Einsatz (LLH-2120)', () => {
   it('hat kein Namensziel (das Ziel ist der Schalter selbst)', () => {
     expect(hasNamensziel('ortung_eingeschaltet')).toBe(false);
     expect(hasNamensziel('ortung_personen_ausgeschaltet')).toBe(false);
+  });
+});
+
+describe('Fristen der Org (LLH-2140)', () => {
+  it('benennt die drei Fristen wie das Formular „Einsatz-Vorgaben“', () => {
+    expect(AKTION_TEXT.aufbewahrung_frist_geaendert).toBe('Aufbewahrungs-Dauer geändert');
+    expect(AKTION_TEXT.skelett_frist_geaendert).toBe('Skelett-Frist geändert');
+    expect(AKTION_TEXT.nachbereitung_frist_geaendert).toBe('Nachbereitung geändert');
+  });
+
+  it('hat kein Namensziel', () => {
+    expect(hasNamensziel('skelett_frist_geaendert')).toBe(false);
+  });
+
+  it.each([
+    [{ tage: 365 }, 'keine → 365 Tage'],
+    [{ tage_vorher: 3650, tage: 365 }, '3650 → 365 Tage'],
+    [{ tage_vorher: 365 }, '365 Tage → keine'],
+    [{ tage_vorher: 2, tage: 1 }, '2 → 1 Tag'],
+    [{ tage: 1 }, 'keine → 1 Tag'],
+  ])('zeigt den Wechsel %j als „%s“', (angaben, text) => {
+    expect(fristText(angaben)).toBe(text);
+  });
+
+  it('gibt ohne Tage nichts zurück (andere Aktionen, alte Einträge)', () => {
+    expect(fristText({})).toBeUndefined();
+    expect(fristText({ fingerabdruck: 'AB' })).toBeUndefined();
   });
 });

@@ -1424,7 +1424,7 @@
       },
       "AdminAktion": {
         "type": "string",
-        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0379_org_fremdebenen_lan.sql`) — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
+        "description": "Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in\n`migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,\n`0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und\n`0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0392_admin_audit_fristen.sql`) — beide Seiten\nmüssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich\nSchema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).",
         "enum": [
           "benutzer_angelegt",
           "benutzer_deaktiviert",
@@ -1492,7 +1492,10 @@
           "ortung_eingeschaltet",
           "ortung_ausgeschaltet",
           "ortung_personen_eingeschaltet",
-          "ortung_personen_ausgeschaltet"
+          "ortung_personen_ausgeschaltet",
+          "aufbewahrung_frist_geaendert",
+          "skelett_frist_geaendert",
+          "nachbereitung_frist_geaendert"
         ]
       },
       "AdressatKategorie": {
@@ -27507,6 +27510,22 @@
                 "type": "null"
               }
             ]
+          },
+          "tage": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Frist der Org: Tage nach der Änderung; fehlt, wenn die Frist geleert wurde."
+          },
+          "tage_vorher": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "format": "int64",
+            "description": "Frist der Org (LLH-2140): Tage vor der Änderung; fehlt, wenn vorher keine Frist galt."
           },
           "zugang_id": {
             "type": [

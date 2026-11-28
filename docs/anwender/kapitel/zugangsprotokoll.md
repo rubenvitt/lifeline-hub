@@ -95,6 +95,12 @@ abgewiesene Aktion hinterlässt nichts.
   der Schalter wirklich wechselt. Wer die Ortung ausschaltet, während Personen geortet wurden,
   hinterlässt beide Zeilen. Das Einschalten der Ortung ist zugleich die Bestätigung von
   Einwilligung bzw. Betriebsvereinbarung, siehe [Helfer anmelden](helfer-anmelden.md).
+- **„Aufbewahrungs-Dauer geändert“**, **„Skelett-Frist geändert“** und **„Nachbereitung
+  geändert“**: unter „Einsatz-Vorgaben“, Bereich „Aufbewahrung“, nur wenn sich die Frist wirklich
+  ändert. „Detail“ nennt die Tage vorher und nachher, etwa „3650 → 365 Tage“; „keine“ heißt, dass
+  keine Frist galt oder die Frist geleert wurde. Ändert jemand zwei Fristen auf einmal, entstehen
+  zwei Zeilen. Eine kürzere Skelett-Frist löscht im nächsten Lauf endgültig, siehe
+  [Aufbewahrung](aufbewahrung.md).
 - **„Zweitfaktor zurückgesetzt“**: steht in der Auswahl; die Oberfläche der Verwaltung bietet
   das Zurücksetzen derzeit nicht an.
 

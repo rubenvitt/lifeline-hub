@@ -91,6 +91,9 @@ export const AKTION_TEXT: Record<AdminAktion, string> = {
   ortung_ausgeschaltet: 'Ortung im Einsatz ausgeschaltet',
   ortung_personen_eingeschaltet: 'Ortung von Personen eingeschaltet',
   ortung_personen_ausgeschaltet: 'Ortung von Personen ausgeschaltet',
+  aufbewahrung_frist_geaendert: 'Aufbewahrungs-Dauer geändert',
+  skelett_frist_geaendert: 'Skelett-Frist geändert',
+  nachbereitung_frist_geaendert: 'Nachbereitung geändert',
 };
 
 /**
@@ -157,6 +160,18 @@ export function rollenText(a: ZugangsAngaben): string | undefined {
   rolle(ROLLE_IN_VERWALTUNG_FELD, SYSTEM_ROLLE, a.system_rolle_vorher, a.system_rolle);
   rolle(ROLLE_IN_ORG_FELD, ORG_ROLLE, a.org_rolle_vorher, a.org_rolle);
   return teile.length > 0 ? teile.join(', ') : undefined;
+}
+
+/**
+ * Wechsel einer Frist der Org (LLH-2140) in Tagen: „3650 → 365 Tage“, „keine → 365 Tage“ beim
+ * ersten Setzen, „365 Tage → keine“ beim Leeren. `undefined`, wenn die Angaben keine Tage tragen.
+ */
+export function fristText(a: ZugangsAngaben): string | undefined {
+  const vorher = a.tage_vorher ?? null;
+  const nachher = a.tage ?? null;
+  const tage = (n: number) => `${n} ${n === 1 ? 'Tag' : 'Tage'}`;
+  if (nachher == null) return vorher == null ? undefined : `${tage(vorher)} → keine`;
+  return `${vorher ?? 'keine'} → ${tage(nachher)}`;
 }
 
 /**

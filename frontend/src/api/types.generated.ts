@@ -578,12 +578,12 @@ export interface components {
          * @description Protokollierte Admin-Aktion. Die Wire-Werte stehen als CHECK in
          *     `migrations/0156_admin_audit.sql`, erweitert in `0170_admin_audit_sitzung_beendet.sql`,
          *     `0174_admin_audit_einmalpasswort.sql`, `0269_admin_audit_lesezugang.sql` und
-         *     `0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0379_org_fremdebenen_lan.sql`) — beide Seiten
+         *     `0301_admin_audit_instanz.sql` (zuletzt neu gefasst in `0392_admin_audit_fristen.sql`) — beide Seiten
          *     müssen zusammenpassen (Test `jede_aktion_passiert_den_db_check`). Zugleich
          *     Schema-Anker der Union in [`ZugangsaenderungAnzeige`] (LFH-120).
          * @enum {string}
          */
-        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen" | "maschinenzugang_webhook_pin_gesetzt" | "maschinenzugang_webhook_pin_entfernt" | "maschinenzugang_webhook_zertifikat_abgerufen" | "adapter_angelegt" | "adapter_geaendert" | "adapter_geloescht" | "adapter_geheimnis_gesetzt" | "adapter_geheimnis_entfernt" | "adapter_lan_erlaubt" | "adapter_lan_entzogen" | "adapter_angehalten" | "adapter_fortgesetzt" | "fremdebenen_lan_erlaubt" | "fremdebenen_lan_entzogen" | "ortung_eingeschaltet" | "ortung_ausgeschaltet" | "ortung_personen_eingeschaltet" | "ortung_personen_ausgeschaltet";
+        AdminAktion: "benutzer_angelegt" | "benutzer_deaktiviert" | "benutzer_reaktiviert" | "rolle_geaendert" | "zweitfaktor_zurueckgesetzt" | "anmeldeweg_aktiviert" | "anmeldeweg_deaktiviert" | "sitzung_beendet" | "einmalpasswort_vergeben" | "lesezugang_angelegt" | "lesezugang_widerrufen" | "instanz_code_ausgestellt" | "instanz_code_eingeloest" | "instanz_zertifikat_gewechselt" | "instanz_adresse_geaendert" | "instanz_gekoppelt" | "instanz_kopplung_widerrufen" | "instanz_kopplung_vom_gegenueber_widerrufen" | "unterschrift_registriert" | "unterschrift_gegengezeichnet" | "unterschrift_widerrufen" | "unterschrift_abgelehnt" | "unterschrift_bestaetigt" | "unterschrift_zurueckgewiesen" | "fuehrung_notuebernahme" | "fuehrung_verworfen" | "fuehrung_widerspruch" | "instanz_elw_verloren" | "archiv_schluessel_eingetragen" | "archiv_schluessel_geprueft" | "archiv_schluessel_entfernt" | "archiv_heruntergeladen" | "archiv_eingespielt" | "archiv_person_geschwaerzt" | "archiv_durchsucht" | "maschinenzugang_angelegt" | "maschinenzugang_code_ausgestellt" | "maschinenzugang_schluessel_gebunden" | "maschinenzugang_geaendert" | "maschinenzugang_widerrufen" | "einwurf_zugang_angelegt" | "einwurf_zugang_schluessel_gewechselt" | "einwurf_zugang_widerrufen" | "maschinenzugang_webhook_angelegt" | "maschinenzugang_webhook_geaendert" | "maschinenzugang_webhook_entfernt" | "maschinenzugang_webhook_wieder_aufgenommen" | "maschinenzugang_webhook_lan_erlaubt" | "maschinenzugang_webhook_lan_entzogen" | "maschinenzugang_webhook_pin_gesetzt" | "maschinenzugang_webhook_pin_entfernt" | "maschinenzugang_webhook_zertifikat_abgerufen" | "adapter_angelegt" | "adapter_geaendert" | "adapter_geloescht" | "adapter_geheimnis_gesetzt" | "adapter_geheimnis_entfernt" | "adapter_lan_erlaubt" | "adapter_lan_entzogen" | "adapter_angehalten" | "adapter_fortgesetzt" | "fremdebenen_lan_erlaubt" | "fremdebenen_lan_entzogen" | "ortung_eingeschaltet" | "ortung_ausgeschaltet" | "ortung_personen_eingeschaltet" | "ortung_personen_ausgeschaltet" | "aufbewahrung_frist_geaendert" | "skelett_frist_geaendert" | "nachbereitung_frist_geaendert";
         /**
          * @description Geteilte externe Adressat-Kategorie für Nachforderung (`adressat_kategorie`) und Auftrag
          *     (`extern_kategorie`) (Schema-Anker für die OpenAPI-Union, LFH-120).
@@ -10855,6 +10855,16 @@ export interface components {
             scopes_vorher?: string[] | null;
             system_rolle?: components["schemas"]["SystemRolle"] | null;
             system_rolle_vorher?: components["schemas"]["SystemRolle"] | null;
+            /**
+             * Format: int64
+             * @description Frist der Org: Tage nach der Änderung; fehlt, wenn die Frist geleert wurde.
+             */
+            tage?: number | null;
+            /**
+             * Format: int64
+             * @description Frist der Org (LLH-2140): Tage vor der Änderung; fehlt, wenn vorher keine Frist galt.
+             */
+            tage_vorher?: number | null;
             /** @description Maschinenzugang (LLH-1652): seine Kennung. */
             zugang_id?: string | null;
         };
