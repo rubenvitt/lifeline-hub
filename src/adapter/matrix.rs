@@ -379,7 +379,41 @@ impl Clients {
         let adapter_id = adapter_id.to_string();
         async move {
             // Scheitert es, bleibt es vorgemerkt; der nächste Zugriff versucht es wieder.
-            drop(self.sperre(&adapter_id, &eintrag).await);
+            if let Ok(sperre) = self.sperre(&adapter_id, &eintrag).await {
+                drop(sperre);
+                self.vergiss_falls_frei(&adapter_id, &eintrag);
+            }
+            // Läuft die Frist des Aufrufers vorher ab, bleibt ein leerer Eintrag liegen; er ist
+            // gleichwertig mit einem neuen, der nächste Zugriff nimmt ihn.
+        }
+    }
+
+    /// Nimmt einen geräumten Eintrag aus der Liste (LLH-2148), damit gelöschte Anbindungen
+    /// keinen Eintrag zurücklassen. Nur, wenn außer der Liste und `eintrag` niemand ihn hält (ein
+    /// Wartender auf die Sperre behielte sonst einen Eintrag, neben dem ein neuer einen zweiten
+    /// Client auf denselben Speicher öffnete), nichts vorgemerkt ist und kein Client mehr offen
+    /// oder noch gehalten ist. Die Prüfung läuft unter der Sperre der Liste: dort allein entstehen
+    /// neue Halter.
+    fn vergiss_falls_frei(&self, adapter_id: &str, eintrag: &Arc<Eintrag>) {
+        let mut eintraege = self.eintraege.lock().expect("Clients nicht vergiftet");
+        let Some(gelistet) = eintraege.get(adapter_id) else {
+            return;
+        };
+        if !Arc::ptr_eq(gelistet, eintrag) || Arc::strong_count(eintrag) > 2 {
+            return;
+        }
+        if eintrag.verwerfen.load(Ordering::SeqCst) != 0 {
+            return;
+        }
+        let Ok(zugriff) = eintrag.zugriff.try_lock() else {
+            return;
+        };
+        let frei = zugriff.offen.is_none()
+            && zugriff.schliessen.is_none()
+            && zugriff.alt.as_ref().is_none_or(|alt| alt.strong_count() == 0);
+        drop(zugriff);
+        if frei {
+            eintraege.remove(adapter_id);
         }
     }
 
@@ -1034,6 +1068,52 @@ mod tests {
         drop(gehalten);
         assert_eq!(schliesse(&mut zugriff, "a").await, Ok(()));
         assert!(zugriff.alt.is_none());
+    }
+
+    fn hat_eintrag(c: &Clients, adapter_id: &str) -> bool {
+        c.eintraege.lock().unwrap().contains_key(adapter_id)
+    }
+
+    /// Nach dem Verwerfen (Anbindung gelöscht, neues Token) bleibt kein leerer Eintrag liegen.
+    #[tokio::test]
+    async fn verwerfen_nimmt_den_freien_eintrag_aus_der_liste() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = Clients::new(tmp.path().to_path_buf());
+        c.eintrag("a").set_befund(None);
+        assert!(hat_eintrag(&c, "a"));
+        c.verwerfen("a").await;
+        assert!(!hat_eintrag(&c, "a"));
+    }
+
+    /// Hält noch jemand den Eintrag (wartet etwa auf die Sperre), bleibt er stehen: ein neuer
+    /// Eintrag daneben öffnete sonst einen zweiten Client auf denselben Speicher.
+    #[tokio::test]
+    async fn verwerfen_laesst_einen_gehaltenen_eintrag_stehen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = Clients::new(tmp.path().to_path_buf());
+        let gehalten = c.eintrag("a");
+        c.verwerfen("a").await;
+        assert!(hat_eintrag(&c, "a"));
+        assert!(Arc::ptr_eq(&gehalten, &c.eintrag("a")));
+    }
+
+    /// Ist ein Client noch nicht ganz los, bleibt der Eintrag, damit der nächste Zugriff wartet.
+    #[tokio::test]
+    async fn vergessen_laesst_einen_eintrag_mit_altem_client_stehen() {
+        let tmp = tempfile::tempdir().unwrap();
+        let c = Clients::new(tmp.path().to_path_buf());
+        let eintrag = c.eintrag("a");
+        let client = matrix_sdk::Client::builder()
+            .homeserver_url("http://127.0.0.1:1")
+            .build()
+            .await
+            .unwrap();
+        eintrag.zugriff.lock().await.alt = Some(client.downgrade());
+        c.vergiss_falls_frei("a", &eintrag);
+        assert!(hat_eintrag(&c, "a"));
+        drop(client);
+        c.vergiss_falls_frei("a", &eintrag);
+        assert!(!hat_eintrag(&c, "a"));
     }
 
     /// `raeume` setzt die Vormerkung nur zurück, wenn seit seinem Beginn kein Verwerfen dazukam.

@@ -52,7 +52,8 @@ verlange 'CollectStrategy::AllDevices' src/adapter/matrix.rs
 verlange 'client_builder_mit_zielschutz' src/adapter/matrix.rs
 verlange 'ausgang-\{versand_id\}-\{teil\}' src/ausgang/zusteller/matrix.rs
 verlange 'KanalArt::Matrix => self\.matrix\.zustellen' src/ausgang/zusteller.rs
-verbiete 'matrix_sdk::Client::builder' 'src/**/*.rs' ':(exclude)src/adapter/matrix.rs'
+for f in $(git grep --untracked -l 'matrix_sdk' -- ':(glob)src/**/*.rs' ':(exclude)src/adapter/matrix.rs'); do verbiete 'ClientBuilder|::builder([^A-Za-z0-9_]|$)' "$f"; done
+verbiete 'matrix_sdk *as |matrix_sdk::\{ *self +as |use +matrix_sdk *;|pub(\([a-z ]+\))? +use +(::)?matrix_sdk|extern +crate +matrix_sdk|type +[A-Za-z0-9_]+(<[^>]*>)? *= *(::)?matrix_sdk' 'src/**/*.rs'
 verbiete 'fn http_im_lan' src/adapter/matrix_art.rs
 verbiete 'matrix' 'src/backup/**/*.rs'
 verbiete 'ohne_zielschutz_fuer_tests' 'src/**/*.rs' ':(exclude)src/adapter/ziel.rs' ':(exclude)src/adapter/matrix.rs'
