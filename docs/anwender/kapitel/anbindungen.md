@@ -201,7 +201,8 @@ Für den System-Admin:
 2. „Adapter anlegen“ wählen, unter „Art“ die Art des Fremdsystems wählen und einen „Name“
    eintragen, etwa „Alarmquelle Leitstelle“.
 3. Die Felder der Art ausfüllen, etwa die Adresse, und das „Intervall“ in Sekunden prüfen. Die Art
-   schlägt ein Intervall vor und nennt das kleinste erlaubte.
+   schlägt ein Intervall vor und nennt das kleinste erlaubte. Eine Art für den Versand (E-Mail,
+   Matrix, Fax) hat kein Feld „Intervall“: sie prüft ihre Verbindung in einem festen Takt.
 4. Nur für einen Server im lokalen Netz: „Ziel im eigenen Netz erlauben“ ankreuzen.
 5. „Anlegen“ wählen. Danach steht die Ansicht des neuen Adapters.
 
@@ -302,7 +303,8 @@ Abruf.
 ### Adapter bearbeiten
 
 1. In der Ansicht des Adapters im Paneel „Einstellungen“ „Bearbeiten“ wählen.
-2. Name, Intervall oder die Felder der Art ändern und „Speichern“ wählen.
+2. Name, Intervall oder die Felder der Art ändern und „Speichern“ wählen. Eine Art für den
+   Versand hat kein „Intervall“.
 
 Ändert sich dabei der Server einer Adresse, fragt die Seite „Neues Ziel: Geheimnisse werden
 entfernt“ und nennt den bisherigen und den neuen Server. „Speichern und entfernen“ speichert;
@@ -650,7 +652,8 @@ der Adresse.
 
 - **„ok“**: Der letzte Abruf war erfolgreich. Die Liste zeigt dann keinen Status, nur „zuletzt
   erfolgreich“.
-- **„noch nie abgerufen“**: Der Adapter ist neu und hat noch nicht abgerufen.
+- **„noch nie abgerufen“**: Der Adapter ist neu und hat noch nicht abgerufen. Eine Art für den
+  Versand zeigt hier **„noch nicht geprüft“**.
 - **„gestört“**: Der letzte Abruf scheiterte an etwas Vorübergehendem (keine Verbindung, keine
   Antwort in 20 s, Fehler des Servers). Der Adapter versucht es von selbst wieder, zuerst nach
   einer Minute, dann nach jeweils doppelt so langer Pause, bis die Pause 15 Minuten erreicht. Kürzer
@@ -665,6 +668,15 @@ der Adresse.
 
 Unter „Letzte Versuche“ stehen die letzten 50 Abrufe und Prüfungen mit Zeit, Ergebnis und Dauer.
 Was das Fremdsystem geantwortet hat, speichert der Server nicht.
+
+### Anbindungen für den Versand
+
+E-Mail (SMTP), Matrix und Fax (sipgate) rufen nichts ab. Ihr Lauf prüft stündlich nur die
+Verbindung, damit etwa ein abgelaufenes Passwort auffällt, bevor eine Nachricht daran scheitert.
+Ihre Ansicht spricht deshalb von Prüfung: „Zuletzt geprüft“ statt „Zuletzt erfolgreich“ und
+ohne Anzahl der Einträge, „Nächste Prüfung“ statt „Nächster Versuch“, das Paneel heißt „Letzte
+Prüfungen“, und eine gelungene Prüfung steht dort als „erreichbar“. Das Intervall ist fest und
+lässt sich nicht ändern.
 
 ### Benachrichtigung bei einer Störung
 
@@ -705,8 +717,8 @@ sich bei einem Hub meldet, hat keine eigene Mailanbindung.
 
 ### Versand in Matrix-Räume
 
-Die Art „Matrix“ ruft ebenfalls nichts ab: ihr Lauf prüft nur die Verbindung (vorgeschlagen
-stündlich, frühestens alle 15 Minuten) und sendet nichts. Gesendet wird, was Personen aus dem
+Die Art „Matrix“ ruft ebenfalls nichts ab: ihr Lauf prüft nur die Verbindung (stündlich, fest)
+und sendet nichts. Gesendet wird, was Personen aus dem
 Einsatz senden (Kapitel [Lageberichte](lageberichte.md), „Versand per E-Mail und Matrix“). Alle
 Anfragen gehen an den eingetragenen Homeserver, nur über `https://` und mit demselben Zielschutz
 wie bei Webhooks; die Adresse wird nicht über den Servernamen nachgeschlagen. Eine Organisation,
