@@ -291,7 +291,7 @@ pub fn rahmen_threema() -> Rahmen {
 }
 
 /// Ein Rahmen mit allen Versand-Arten: E-Mail und Fax je mit Skript-Prüfer (LLH-2095), dazu
-/// `matrix` mit eigenen Clients ohne Netz (LLH-2094).
+/// `matrix` mit eigenen Clients ohne Netz (LLH-2094) und `threema` ohne Netz (LLH-2096).
 pub fn rahmen_ausgang() -> (Rahmen, Arc<SmtpSkript>, Arc<SipgateSkript>) {
     let smtp = Arc::new(SmtpSkript::default());
     let fax = Arc::new(SipgateSkript::default());
@@ -306,6 +306,9 @@ pub fn rahmen_ausgang() -> (Rahmen, Arc<SmtpSkript>, Arc<SipgateSkript>) {
             Arc::new(lifeline_hub::adapter::matrix_art::MatrixArt::new(
                 clients.clone(),
             )),
+            Arc::new(
+                lifeline_hub::adapter::threema_art::ThreemaArt::ohne_netz().expect("Debug-Build"),
+            ),
         ]),
         clients,
     );

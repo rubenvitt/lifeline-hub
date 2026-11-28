@@ -130,7 +130,10 @@ impl Zusteller for MatrixZusteller {
             };
             let teile = std::mem::take(&mut *teile.lock().expect("Teile nicht vergiftet"));
             match ergebnis {
-                Ok(()) => Ok(Zustellt { teile }),
+                Ok(()) => Ok(Zustellt {
+                    teile,
+                    neuer_schluessel: None,
+                }),
                 Err(f) => Err(matrix_fehlschlag(f, teile)),
             }
         })
@@ -350,6 +353,7 @@ fn fehlschlag(fehler: Zustellfehler, grund: &str, teile: Vec<(i64, String)>) -> 
         grund: grund.into(),
         smtp_status: None,
         teile,
+        neuer_schluessel: None,
     }
 }
 
