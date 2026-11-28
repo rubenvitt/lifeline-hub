@@ -18,6 +18,8 @@ pub const ABLAUF_STUNDEN: i64 = 12;
 pub const AUFBEWAHRUNG_TAGE: i64 = 7;
 
 /// Prädikat „Vorschlag (Alias `v`) ist abgelaufen“, nur sinnvoll zusammen mit `v.status = 'offen'`.
+/// Die Stunden stehen als Literal (`concat!`) und müssen [`ABLAUF_STUNDEN`] gleichen; ein Test
+/// (`ablaufpraedikat_nutzt_ablauf_stunden`) hält beide zusammen.
 /// `?1` ist `jetzt`. Es gibt kein zweites: Liste, Zähler, Laden und Übernehmen beziehen es von hier.
 macro_rules! ist_abgelaufen_sql {
     () => {
@@ -352,6 +354,16 @@ mod tests {
     use crate::public_api::zugang;
 
     const JETZT: &str = "2026-11-28 10:00:00";
+
+    /// Das SQL-Prädikat braucht ein Literal (`concat!`); dieser Test bindet es an
+    /// [`ABLAUF_STUNDEN`], damit eine Änderung der Konstante den Ablauf mitändert (Review M6).
+    #[test]
+    fn ablaufpraedikat_nutzt_ablauf_stunden() {
+        assert!(
+            ist_abgelaufen_sql!().contains(&format!("datetime(?1, '-{ABLAUF_STUNDEN} hours')")),
+            "ist_abgelaufen_sql! weicht von ABLAUF_STUNDEN ab"
+        );
+    }
 
     async fn grundlage(pool: &SqlitePool) -> (i64, String, i64) {
         sqlx::query("INSERT OR IGNORE INTO organisation (id, name) VALUES (1, 'Test-Orga')")
