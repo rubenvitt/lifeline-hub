@@ -301,6 +301,49 @@ impl Welt {
         .await
     }
 
+    async fn threema_anbindung(&self) {
+        let body = json!({
+            "art": "threema", "name": "Threema",
+            "einstellungen": { "gateway_id": "*LAGE123" }
+        });
+        let (s, a) = anfrage_json(
+            &self.app,
+            "POST",
+            "/api/admin/adapter",
+            &self.admin,
+            Some(&body),
+        )
+        .await;
+        assert_eq!(s, StatusCode::CREATED, "{a}");
+        let id = a["id"].as_str().unwrap();
+        for (platz, wert) in [
+            ("secret", "geheim".to_string()),
+            ("privater_schluessel", "05".repeat(32)),
+        ] {
+            let (s, v) = anfrage_json(
+                &self.app,
+                "PUT",
+                &format!("/api/admin/adapter/{id}/secrets/{platz}"),
+                &self.admin,
+                Some(&json!({ "wert": wert })),
+            )
+            .await;
+            assert_eq!(s, StatusCode::NO_CONTENT, "{v}");
+        }
+    }
+
+    /// Eine Stelle mit einer Threema-ID.
+    async fn threema_kanal(&self) -> i64 {
+        stelle_mit(
+            &self.pool,
+            self.org_id,
+            "Kreisverwaltung",
+            "threema",
+            "ECHOECHO",
+        )
+        .await
+    }
+
     async fn setze_fehlgeschlagen(&self, id: &str) {
         sqlx::query(
             "UPDATE ausgang SET zustand = 'fehlgeschlagen', fehler_art = 'abgelehnt', \
@@ -550,6 +593,46 @@ async fn matrix_versand_ohne_matrix_anbindung_ist_422_anbindung_fehlt() {
     assert_eq!(v["grund"], "anbindung_fehlt");
     assert_eq!(v["error"], "Kein Matrix-Konto eingerichtet");
     assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn ohne_threema_anbindung_422_mit_text() {
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    let tk = w.threema_kanal().await;
+    let (s, v) = w.lb_senden(lid, "t-1", &[tk]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_fehlt");
+    assert_eq!(v["error"], "Kein Threema-Gateway eingerichtet");
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn matrix_und_threema_fehlen_in_einer_ablehnung() {
+    let w = welt().await;
+    let lid = w.lagebericht(true).await;
+    let mk = w.matrix_kanal().await;
+    let tk = w.threema_kanal().await;
+    let (s, v) = w.lb_senden(lid, "t-2", &[mk, tk, w.kanaele[0]]).await;
+    assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{v}");
+    assert_eq!(v["grund"], "anbindung_fehlt");
+    assert_eq!(
+        v["error"],
+        "Kein Matrix-Konto eingerichtet; Kein Threema-Gateway eingerichtet"
+    );
+    assert_eq!(w.anzahl().await, 0);
+}
+
+#[tokio::test]
+async fn threema_mit_anbindung_legt_versand_an() {
+    let w = welt_mit(false).await;
+    w.threema_anbindung().await;
+    let lid = w.lagebericht(true).await;
+    let tk = w.threema_kanal().await;
+    let (s, v) = w.lb_senden(lid, "t-3", &[tk]).await;
+    assert_eq!(s, StatusCode::CREATED, "{v}");
+    assert_eq!(v[0]["channel"], "threema", "{v}");
+    assert_eq!(v[0]["address"], "ECHOECHO", "{v}");
 }
 
 #[tokio::test]

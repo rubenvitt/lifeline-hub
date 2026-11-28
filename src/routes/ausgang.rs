@@ -82,6 +82,11 @@ fn meldung_anbindung(kanal: KanalArt, fehler: AusgangFehler) -> &'static str {
         (KanalArt::Matrix, AusgangFehler::AnbindungFehlt) => "Kein Matrix-Konto eingerichtet",
         (KanalArt::Matrix, AusgangFehler::AnbindungAngehalten) => "Das Matrix-Konto ist angehalten",
         (KanalArt::Matrix, _) => "Das Matrix-Konto ist nicht nutzbar; Einstellungen prüfen",
+        (KanalArt::Threema, AusgangFehler::AnbindungFehlt) => "Kein Threema-Gateway eingerichtet",
+        (KanalArt::Threema, AusgangFehler::AnbindungAngehalten) => {
+            "Das Threema-Gateway ist angehalten"
+        }
+        (KanalArt::Threema, _) => "Das Threema-Gateway ist nicht nutzbar; Einstellungen prüfen",
         (_, AusgangFehler::AnbindungFehlt) => "Kein Mailserver eingerichtet",
         (_, AusgangFehler::AnbindungAngehalten) => "Der Mailserver ist angehalten",
         _ => "Der Mailserver ist nicht nutzbar; Einstellungen prüfen",
@@ -336,8 +341,10 @@ async fn anlegen(
     }
 
     // Je Kanal der Empfänger eine nicht angehaltene Anbindung der Org (sonst 422 mit Code);
-    // gemischte Empfänger brauchen beide. Nur Zustand, kein Entschlüsseln: das Geheimnis liest
-    // allein der Lauf.
+    // gemischte Empfänger brauchen alle. Eine Ablehnung nennt jeden Kanal ohne nutzbare
+    // Anbindung (LLH-2096), damit der Dialog alle auf einmal sperrt; der Code ist der des ersten.
+    // Nur Zustand, kein Entschlüsseln: das Geheimnis liest allein der Lauf.
+    let mut fehlend: Vec<(AusgangFehler, &'static str)> = Vec::new();
     for kanal in KanalArt::ALLE {
         if !adressen.iter().any(|(_, k, _)| k.channel == kanal) {
             continue;
@@ -350,8 +357,12 @@ async fn anlegen(
         )
         .await?
         {
-            return Err(mit_grund(fehler, meldung_anbindung(kanal, fehler)));
+            fehlend.push((fehler, meldung_anbindung(kanal, fehler)));
         }
+    }
+    if let Some((fehler, _)) = fehlend.first() {
+        let meldung: Vec<&str> = fehlend.iter().map(|(_, m)| *m).collect();
+        return Err(mit_grund(*fehler, &meldung.join("; ")));
     }
 
     let geladen = match quelle {
