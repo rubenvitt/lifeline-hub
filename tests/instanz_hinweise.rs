@@ -496,7 +496,12 @@ async fn gesperrter_hub_zeigt_die_sperre_am_einsatz_und_an_der_kopplung() {
     // Ein Spiegel zeigt die Sperre nie (`e.spiegel = 0` in der Spalte): Hinweise eines Spiegels
     // reisen nicht über diese Kopplung. Am Hub prüfte das nichts, denn dort ist die Kopplung
     // `wird_gemeldet` (LLH-2086); deshalb derselbe Einsatz am ELW, kurz als Spiegel markiert.
-    let als_spiegel = |wert: i64| format!("UPDATE einsatz SET spiegel = {wert} WHERE id = {}", w.einsatz);
+    let als_spiegel = |wert: i64| {
+        format!(
+            "UPDATE einsatz SET spiegel = {wert} WHERE id = {}",
+            w.einsatz
+        )
+    };
     exec(&elw.pool, &als_spiegel(1)).await;
     let (s, spiegel) = common::anfrage_json(
         &elw.app,
