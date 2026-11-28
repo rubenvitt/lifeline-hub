@@ -221,6 +221,11 @@ Anbindung der Organisation: einen Mailserver bzw. ein Matrix-Konto (Kapitel
 - **Wiederholung.** Ist der Mailserver nicht erreichbar, versucht die App es bis zu 30 Minuten
   lang weiter; danach steht der Versand als „fehlgeschlagen“ da. Eine Ablehnung durch den
   Mailserver, eine falsche Anmeldung oder eine gestörte Anbindung scheitern sofort.
+- **Fehlende Anbindung.** Fehlt der Mailserver, das Matrix-Konto oder der Faxzugang oder ist er
+  angehalten, sendet „Senden“ nichts. Im Dialog sind dann die Adressen dieses Wegs gesperrt, der
+  Grund steht dahinter („Kein Mailserver eingerichtet“). Für eine gesperrte Mailadresse hakt der
+  Dialog den Matrix-Raum derselben Stelle an, für einen gesperrten Matrix-Raum ihre Mailadresse;
+  eine Faxnummer bekommt keinen Ersatz.
 - **„Zustellung unklar“.** Bricht die Verbindung ab, nachdem der Text übertragen wurde, aber bevor
   der Mailserver bestätigt, ist offen, ob die Mail raus ist. Die App wiederholt dann nicht von
   selbst; ob „Erneut senden“, entscheidet die Person (sonst käme dieselbe Meldung doppelt an).
