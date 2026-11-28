@@ -73,7 +73,7 @@ Ansprechpartner der Stelle, mit den PNG-Anlagen als Bilder.
 **Gewählt: eigener schlanker Client über unseren `reqwest`-Client, Verschlüsselung mit
 `crypto_box` und `crypto_secretbox` (RustCrypto, MIT/Apache, reines Rust).** Das ist dasselbe
 Muster wie bei sipgate (`adapter::sipgate`): feste Basis-URL, Zielschutz, keine Weiterleitung,
-gedeckelte Antworten. Die API ist klein: fünf Aufrufe (siehe Abschnitt 3).
+gedeckelte Antworten. Die API ist klein: vier Aufrufe (siehe Abschnitt 3).
 
 Verworfen:
 - **Crate `threema-gateway`.** Bringt eigenen HTTP-Client und eigene Fehlertypen mit. Unseren
@@ -122,8 +122,11 @@ Verworfen:
   1. `GET /credits` mit `from` und `secret`: 401 → `abgelehnt`; sonst das Guthaben lesen.
   2. `GET /pubkeys/{gateway_id}`: Der öffentliche Schlüssel, den Threema für die eigene ID kennt,
      muss zum privaten Schlüssel der Anbindung passen (aus ihm abgeleitet). Passt er nicht →
-     `schluessel_passen_nicht` (den Code gibt es seit Matrix). Text für Threema: „Der private
-     Schlüssel gehört nicht zu dieser Gateway-ID.“
+     `schluessel_passen_nicht` (den Code gibt es seit Matrix). Sein Text gilt je Code, nicht je
+     Art (`ADAPTER_FEHLER_TEXT` in `frontend/src/api/adapter.ts`, `src/benachrichtigung/adapter.rs`);
+     er wird deshalb für beide Arten gefasst: „Schlüssel passen nicht zum Zugang. Bei Matrix ein
+     neues Access-Token anlegen, bei Threema den privaten Schlüssel der Gateway-ID eintragen.“
+     *(Eigene Wahl: kein Text je Art, der einen neuen Mechanismus bräuchte.)*
   3. Das Guthaben merkt die Anbindung als Angabe der Prüfung und zeigt es an („Guthaben:
      1 234 Credits“). Bei 0 zeigt sie einen Hinweis (kein Fehler, kein Störungszustand), weil
      dann jeder Versand scheitert.
@@ -131,7 +134,7 @@ Verworfen:
 
 ### 3. Der Client (`adapter::threema`)
 
-Fünf Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) und `secret`:
+Vier Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) und `secret`:
 
 | Aufruf | Zweck |
 |---|---|
@@ -140,9 +143,14 @@ Fünf Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) un
 | `POST /upload_blob` (multipart, Feld `blob`) | verschlüsselte Anlage hochladen, liefert Blob-ID |
 | `POST /send_e2e` (Formular: `to`, `nonce`, `box`) | verschlüsselte Nachricht senden, liefert Nachrichten-ID |
 
-- Gebaut über `ausgehend::client_builder(Zweck::Anbindung)` mit dem Resolver des Zielschutzes
+- Gebaut über `ausgehend::client_builder(Zweck::Adapter)` mit dem Resolver des Zielschutzes
   (wie `adapter::sipgate`), ohne Weiterleitungen. Zeitlimits: Abfrage 20 s, Senden 30 s, Upload
-  120 s. Antworten auf 64 KiB gedeckelt.
+  120 s. Antworten auf 64 KiB gedeckelt. Eine ganze Zustellung hat ein Gesamtlimit
+  `THREEMA_ZUSTELL_ZEITLIMIT`, das wie `MATRIX_ZUSTELL_ZEITLIMIT` per Compile-Zeit-Prüfung unter
+  `lauf::HAENGT_NACH` bleibt. *(Eigene Wahl, nach dem Gegenlesen.)*
+- Den Multipart-Body von `upload_blob` (ein Feld `blob`, `application/octet-stream`) baut der
+  Client selbst mit fester Boundary; das Feature `multipart` von reqwest kommt nicht dazu.
+  *(Eigene Wahl: keine neue Abhängigkeit für ein einziges Feld.)*
 - `secret` und Inhalt gehen im Body (Formular), nicht in der URL, wo die API das erlaubt; bei
   `GET` stehen `from` und `secret` in der Query. Deshalb loggt der Client nie eine URL (wie
   sipgate: nie Token, Inhalt oder Antworttext in Log oder Fehler).
@@ -211,12 +219,14 @@ Fünf Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) un
   k…k+n−1). Weil der Schnappschuss unveränderlich ist, ergibt jeder Versuch dieselbe Folge. Der
   Zusteller lässt gemerkte Teile (`ausgang_teil`) aus und meldet jeden gesendeten Teil mit der
   Nachrichten-ID von Threema (Spalte `event_id`).
-- **Text teilen:** Der Text ist wie bei Matrix erste Zeile Betreff, dann Inhalt, dann der Fuß
-  („Gesendet mit Lifeline Hub“, Einsatz, absendende Person, Uhrzeit), aber als Klartext ohne
-  Markdown-Maskierung (Threema zeigt `*fett*`; der Betreff steht als `*Betreff*`; Sternchen im
-  Inhalt werden nicht maskiert, Threema kennt kein Escape). Passt er nicht in 3500 Bytes, wird er
+- **Text teilen:** Der Text ist der Betreff als erste Zeile (`*Betreff*`, Threema zeigt das fett),
+  dann der gespeicherte `inhalt` des Schnappschusses. Der trägt den Fuß schon
+  (`nachricht::mit_fuss`, getrennt mit `\n-- \n`); der Zusteller baut ihn nicht neu. Klartext
+  ohne Markdown-Maskierung (Threema kennt kein Escape). Passt der Text nicht in 3500 Bytes, wird er
   an Absatzgrenzen geteilt, notfalls an Zeilen-, zuletzt an Zeichengrenzen (nie mitten in einem
-  UTF-8-Zeichen). Jeder Teil beginnt mit „(i/k)“; der Fuß steht nur im letzten Teil.
+  UTF-8-Zeichen). Jeder Teil beginnt mit „(i/k)“, dessen Länge in die 3500 Bytes zählt; der Fuß
+  landet so von selbst im letzten Teil. Die Nummerierung der Teile ist eine eigene; die von Matrix
+  (Text 0, Anlagen ab 1) wird nicht übernommen.
 - **Ablauf je Versand** (ohne DB-Verbindung):
   1. Öffentlichen Schlüssel des Empfängers holen und mit dem gemerkten vergleichen (Abschnitt 5).
   2. Je fehlendem Teil: Text verschlüsseln und senden; Datei verschlüsseln, hochladen, dann die
@@ -227,12 +237,17 @@ Fünf Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) un
   | Lage | Zustellfehler | ETB-Grund (fest, deutsch) |
   |---|---|---|
   | Verbindung, DNS, Zeit vor dem Senden; 429; 5xx; Abbruch beim Upload | `Voruebergehend` | „Threema nicht erreichbar“ bzw. „Zu viele Anfragen an Threema“ |
-  | Abbruch nach dem Absenden von `send_e2e` | `Ungewiss` | „Ob Threema die Nachricht angenommen hat, ist unklar“ |
+  | Abbruch nach dem Absenden von `send_e2e` | `Ungewiss` | fester Text des Laufs (wie heute) |
   | 401 | `Anbindung { pruefung_vorziehen: true }` | „Threema lehnt die Anmeldung ab“ |
   | 402 | `Anbindung { pruefung_vorziehen: true }` | „Kein Guthaben im Threema-Gateway“ |
   | 400 oder 404 bei `pubkeys` bzw. `send_e2e` | `Abgelehnt` | „Threema-ID unbekannt“ |
-  | 413 | `ZuGross` | „Für Threema zu groß“ |
+  | 413 | `ZuGross` | fester Text des Laufs („Anhänge zu groß“, wie heute) |
   | Schlüssel weicht ab; Verschlüsseln scheitert | `Verschluesselung` | „Der Schlüssel der Threema-ID hat sich geändert“ bzw. „Verschlüsseln nicht möglich“ |
+
+  `lauf::etb_text_mit` nimmt den Grund des Zustellers heute nur bei `Abgelehnt`, `Anbindung`,
+  `Verschluesselung` und einem endgültigen `Voruebergehend`; bei `Ungewiss` und `ZuGross` schreibt er
+  feste Texte. Das bleibt so. *(Eigene Wahl: kein Umbau der Texte von Mail, Matrix und Fax; ein
+  Text über 3500 Bytes kommt nie bei Threema an, also trifft 413 nur Anlagen.)*
 
   Ein Abbruch nach dem Absenden ist `ungewiss`, wie bei SMTP nach DATA und anders als bei Matrix:
   Threema kennt keine Transaktions-ID, ein automatischer neuer Versuch könnte doppelt senden.
@@ -250,7 +265,13 @@ Fünf Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) un
 - **Senden-Dialog** (`SendenDialog.tsx`): Threema-IDs erscheinen in der Liste je Stelle, Kanal
   als kleines Zeichen davor (`kanalAnzeige.ts`, gibt es schon). Vorbelegt wird je Stelle die
   erste Matrix-Adresse, sonst die erste Threema-ID, sonst die erste Mailadresse; Fax wird nie
-  vorbelegt. Gesperrt mit Grund je Kanal („Kein Threema-Gateway eingerichtet“).
+  vorbelegt. Gesperrt wird wie heute erst nach der Ablehnung durch den Server (422
+  `anbindung_fehlt`), nicht vorab: Der Matrix-Sonderfall (`merkeMatrixSperre`) wird allgemein, ein
+  gesperrter Kanal fällt auf die nächste Adresse derselben Stelle in der Reihenfolge Matrix,
+  Threema, Mail zurück. Damit niemand zwei Ablehnungen hintereinander bekommt, nennt der Server
+  in **einer** Ablehnung alle Kanäle ohne Anbindung (heute bricht die Schleife über
+  `KanalArt::ALLE` in `routes/ausgang.rs` beim ersten ab). *(Eigene Wahl, nach dem Gegenlesen:
+  keine neue Schnittstelle für eine Vorab-Sperre.)*
 - **Versandliste:** Threema-Zeile zeigt die ID; der Endstand ist `uebergeben` („an Threema
   übergeben“).
 - **Anbindungen:** Art „Threema Gateway“ im bestehenden Paneel: Felder Gateway-ID, Secret,
@@ -272,7 +293,8 @@ Fünf Aufrufe gegen `https://msgapi.threema.ch`, alle mit `from` (Gateway-ID) un
 - `docs/anwender`: Anbindungen (Threema Gateway einrichten: E2E-ID bei Threema beantragen,
   Schlüsselpaar mit dem Werkzeug von Threema erzeugen, Gateway-ID, Secret und privaten Schlüssel
   eintragen, Guthaben), Stammdaten (Threema-ID eintragen), Senden (Kosten, kein „zugestellt“).
-- Lizenzen und Advisories nach `scripts/AGENTS.md` für `crypto_box`, `crypto_secretbox`.
+- Lizenzen und Advisories nach `scripts/AGENTS.md` für `crypto_box`, `crypto_secretbox` (und
+  `zeroize`, falls es nicht schon im Baum steht).
 
 ## Testbarkeit
 
