@@ -750,6 +750,30 @@ describe('LagemeldungenPage', () => {
       expect(within(zeile).queryByText('Extern')).toBeNull();
     });
 
+    it('zeigt die Herkunft einer übernommenen Maschinenmeldung, sonst keine Marke (LLH-2112)', async () => {
+      listeLageMeldungen.mockResolvedValue([
+        lage({
+          id: 1,
+          text: 'Vom Funknetz',
+          maschinen_herkunft: {
+            adapter: 'meshtastic',
+            kennung: '!a1b2c3d4',
+            name: 'Nord-1',
+            signiert: false,
+          },
+        }),
+        lage({ id: 2, text: 'Von Hand' }),
+      ]);
+      renderPage();
+      await screen.findByText('Vom Funknetz');
+      const mit = screen.getByText('Vom Funknetz').closest('li') as HTMLElement;
+      const marke = mit.querySelector('[data-lfh="meldung-maschinen-herkunft"]');
+      expect(marke).toHaveTextContent('unverifiziert übernommen · Mesh · Nord-1 · nicht signiert');
+      expect(marke).toHaveAttribute('title', 'Mesh · Knoten „Nord-1“ (!a1b2c3d4) · nicht signiert');
+      const ohne = screen.getByText('Von Hand').closest('li') as HTMLElement;
+      expect(ohne.querySelector('[data-lfh="meldung-maschinen-herkunft"]')).toBeNull();
+    });
+
     it('zählt Lagemeldungen im Kopf und filtert nach Herkunft', async () => {
       listeLageMeldungen.mockResolvedValue([
         lage({ id: 1, text: 'Vom Tablet', is_von_geraet: true }),

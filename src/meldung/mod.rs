@@ -351,6 +351,11 @@ pub struct LageMeldungAnzeige {
     pub richtung: Richtung,
     /// Abgeleitet: erfasst von einem gekoppelten Gerät (Erfasser ist ein Gerätekonto).
     pub is_von_geraet: bool,
+    /// Herkunft einer aus einem Maschinenvorschlag übernommenen Meldung (LLH-2112), wie an der
+    /// Meldung. Fehlt bei jeder anderen und in alten Ständen.
+    #[sqlx(json(nullable))]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub maschinen_herkunft: Option<MaschinenHerkunft>,
     /// Abgeleitet (LLH-1382): jüngste ETB-Berichtigung des Eintrags der Meldung, wie an der
     /// Meldung. `text` bleibt Lage-Text oder Wortlaut (design.md D1). Fehlt in alten Ständen.
     #[serde(skip_serializing_if = "Option::is_none")]

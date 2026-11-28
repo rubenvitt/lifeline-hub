@@ -1161,7 +1161,12 @@ macro_rules! lage_anzeige_select {
              g.anzeigename AS gesehen_von_name, \
              m.meldungsart, m.prioritaet, m.status AS meldung_status, m.richtung, \
              EXISTS (SELECT 1 FROM geraet_kopplung gk WHERE gk.benutzer_id = m.erfasst_von_id) \
-               AS is_von_geraet, ",
+               AS is_von_geraet, \
+             CASE WHEN m.herkunft_adapter IS NULL THEN NULL ELSE json_object( \
+               'adapter', m.herkunft_adapter, 'kennung', m.herkunft_kennung, \
+               'name', m.herkunft_name, \
+               'signiert', json(CASE WHEN m.herkunft_signiert = 1 THEN 'true' ELSE 'false' END)) \
+             END AS maschinen_herkunft, ",
             etb_berichtigung_sql!(),
             " FROM meldung m \
              LEFT JOIN benutzer g ON g.id = m.lage_gesehen_von_id"

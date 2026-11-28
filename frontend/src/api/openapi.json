@@ -14052,6 +14052,17 @@
             ],
             "format": "double"
           },
+          "maschinen_herkunft": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MaschinenHerkunft",
+                "description": "Herkunft einer aus einem Maschinenvorschlag übernommenen Meldung (LLH-2112), wie an der\nMeldung. Fehlt bei jeder anderen und in alten Ständen."
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "meldung_absender": {
             "type": "string"
           },

@@ -42,6 +42,7 @@ import { useFunktionsVorschlaege } from '../fuehrung/useFunktionsVorschlaege';
 import { MELDUNG_STATUS } from '../kommunikation';
 import PrioBadge from '../kommunikation/PrioBadge';
 import BerichtigtMarke from '../meldungen/BerichtigtMarke';
+import MaschinenHerkunftMarke from '../meldungen/MaschinenHerkunftMarke';
 import MeldungFormular from '../meldungen/MeldungFormular';
 import { useStandardRufname } from '../etb/useStandardRufname';
 import LageAngabenBearbeiten from '../meldungen/LageAngabenBearbeiten';
@@ -421,6 +422,11 @@ export default function LagemeldungenPage() {
               wort="Extern"
               style={{ marginInlineEnd: token.marginSM }}
             />
+          )}
+          {l.maschinen_herkunft && (
+            <span style={{ marginInlineEnd: token.marginSM }}>
+              <MaschinenHerkunftMarke herkunft={l.maschinen_herkunft} />
+            </span>
           )}
           {/* Der Text bleibt Lage-Text oder Wortlaut, die Berichtigung steht im ETB (LLH-1382, D1). */}
           <BerichtigtMarke

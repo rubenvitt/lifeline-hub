@@ -5610,6 +5610,7 @@ export interface components {
             lat?: number | null;
             /** Format: double */
             lon?: number | null;
+            maschinen_herkunft?: components["schemas"]["MaschinenHerkunft"] | null;
             meldung_absender: string;
             /** Format: int64 */
             meldung_id: number;

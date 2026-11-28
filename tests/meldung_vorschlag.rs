@@ -247,6 +247,66 @@ async fn eine_erfasste_meldung_traegt_keine_maschinen_herkunft() {
 }
 
 #[tokio::test]
+async fn lagemeldung_aus_vorschlag_traegt_die_herkunft_eine_erfasste_nicht() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let e = einsatz_anlegen(&app, &admin).await;
+    let z = zugang_anlegen(&pool, e).await;
+    let vid = vorschlag(&pool, e, &z, "a", "Lage am Nordtor").await;
+    let mut koerper = meldung_koerper("Lage am Nordtor", None);
+    koerper["meldungsart"] = json!("lagemeldung");
+    let (s, m) = uebernehmen(&app, &admin, e, vid, &koerper).await;
+    assert_eq!(s, StatusCode::CREATED, "{m}");
+    let mid = m["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/incidents/{e}/reports/{mid}/situation-relevant"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, von_hand) = anfrage_json(
+        &app,
+        "POST",
+        &format!("/api/incidents/{e}/reports"),
+        &admin,
+        Some(&meldung_koerper("Von Hand", None)),
+    )
+    .await;
+    assert_eq!(s, StatusCode::CREATED, "{von_hand}");
+    let hid = von_hand["id"].as_i64().unwrap();
+    let (s, v) = anfrage(
+        &app,
+        "POST",
+        &format!("/api/incidents/{e}/reports/{hid}/situation-relevant"),
+        &admin,
+        Some("{}"),
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{v}");
+
+    let (s, lage) = anfrage(
+        &app,
+        "GET",
+        &format!("/api/incidents/{e}/situation/reports"),
+        &admin,
+        None,
+    )
+    .await;
+    assert_eq!(s, StatusCode::OK, "{lage}");
+    let lage = lage.as_array().unwrap();
+    let zeile = |id: i64| lage.iter().find(|l| l["id"] == id).unwrap();
+    assert_eq!(
+        zeile(mid)["maschinen_herkunft"],
+        json!({"adapter": "funk-gateway", "kennung": "unit-7", "name": "Einheit 7", "signiert": true})
+    );
+    assert!(zeile(hid).get("maschinen_herkunft").is_none());
+}
+
+#[tokio::test]
 async fn uebernahme_eines_abgelaufenen_oder_angenommenen_vorschlags_ist_409() {
     let (app, pool) = setup_mit_pool().await;
     let admin = login_cookie(&app, "admin", "startpw12").await;
