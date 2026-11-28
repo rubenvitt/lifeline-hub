@@ -166,6 +166,78 @@ test('Matrix-Raum an der Stelle eintragen, Lagebericht senden, Versandliste zeig
 });
 
 /**
+ * Ausgang per Threema (LLH-2096): eine Threema-ID an der Stelle, Senden, die Versandliste zeigt
+ * „übergeben“. Die Art `threema` prüft neben den Test-Zustellern ohne Netz; zugestellt wird über
+ * das aufzeichnende Doppel. Verschlüsselung und Gateway stehen in `src/ausgang/zusteller/threema.rs`.
+ */
+test('Threema-ID an der Stelle eintragen, Lagebericht senden, Versandliste zeigt „übergeben“', async ({
+  page,
+}) => {
+  await anmeldenAlsAdmin(page);
+  const marke = Date.now();
+
+  const vorhanden = await page.request.get('/api/admin/adapter');
+  expect(vorhanden.ok(), await vorhanden.text()).toBe(true);
+  const { adapter: liste } = (await vorhanden.json()) as { adapter: { art: string }[] };
+  if (!liste.some((a) => a.art === 'threema')) {
+    const angelegt = await page.request.post('/api/admin/adapter', {
+      data: { art: 'threema', name: 'Threema e2e', einstellungen: { gateway_id: '*E2ETEST' } },
+    });
+    expect(angelegt.status(), `Anbindung: ${await angelegt.text()}`).toBe(201);
+    const id = ((await angelegt.json()) as { id: string }).id;
+    for (const [platz, wert] of [
+      ['secret', 'e2e-nur-fuer-den-test'],
+      ['privater_schluessel', '05'.repeat(32)],
+    ]) {
+      const gesetzt = await page.request.put(`/api/admin/adapter/${id}/secrets/${platz}`, {
+        data: { wert },
+      });
+      expect(gesetzt.status(), `${platz}: ${await gesetzt.text()}`).toBe(204);
+    }
+  }
+
+  const stelleName = `Kreis Threema e2e ${marke}`;
+  const stelle = await page.request.post('/api/external-agencies', {
+    data: { bezeichnung: stelleName, art: 'behoerde' },
+  });
+  expect(stelle.status(), `Stelle: ${await stelle.text()}`).toBe(201);
+  const stelleId = ((await stelle.json()) as { id: number }).id;
+  try {
+    await page.goto('/admin/stammdaten/externe-stellen');
+    const zeile = page.getByRole('row').filter({ hasText: stelleName });
+    await zeile.getByRole('button', { name: 'Bearbeiten' }).click();
+    const bearbeiten = await dialogSteht(page, 'Externe Stelle bearbeiten');
+    await bearbeiten.getByRole('radio', { name: 'Threema' }).check();
+    await bearbeiten.getByRole('textbox', { name: 'Threema-ID' }).fill('echo echo');
+    const angelegt = page.waitForResponse(
+      (r) =>
+        r.url().endsWith(`/api/external-agencies/${stelleId}/channels`) &&
+        r.request().method() === 'POST',
+    );
+    await bearbeiten.getByRole('button', { name: 'Adresse hinzufügen' }).click();
+    expect((await angelegt).status()).toBe(201);
+    await expect(bearbeiten.getByText('ECHOECHO', { exact: true })).toBeVisible();
+
+    await page.goto(await freigegebenerLagebericht(page, marke));
+    await page.getByRole('button', { name: 'Senden', exact: true }).click();
+    const dialog = await dialogSteht(page, 'Senden', { exact: true });
+    const haken = dialog.getByRole('checkbox', { name: new RegExp(`Threema ${stelleName}`) });
+    await expect(haken).toBeVisible();
+    if (!(await haken.isChecked())) await haken.check();
+    await dialog.getByRole('button', { name: 'Senden', exact: true }).click();
+    await expect(dialog).toBeHidden();
+
+    const versandliste = page.locator('[data-lfh="versandliste"]');
+    await expect(versandliste).toContainText(`Threema ${stelleName} · ECHOECHO`);
+    await expect(versandliste.locator('[data-state="uebergeben"]')).toHaveCount(1, {
+      timeout: 20_000,
+    });
+  } finally {
+    await page.request.patch(`/api/external-agencies/${stelleId}`, { data: { aktiv: false } });
+  }
+});
+
+/**
  * Ausgang per Fax (LLH-2095): eine Faxnummer an der Stelle, Senden per Fax, die Versandliste
  * zeigt nach der Abfrage beim Doppel „zugestellt“. Das Fax-Doppel hängt am selben Schalter
  * (`--ausgang-testzusteller`) und meldet jedes Fax beim ersten Abfragen als gesendet; die erste
