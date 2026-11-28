@@ -1286,7 +1286,7 @@
             }
           },
           "422": {
-            "description": "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`",
+            "description": "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`, `sent_at` nicht lesbar oder außerhalb der Jahre 2000 bis 2100",
             "content": {
               "application/json": {
                 "schema": {
@@ -2524,7 +2524,8 @@
               "string",
               "null"
             ],
-            "description": "Zeitpunkt der Absendung beim Fremdsystem (UTC, `JJJJ-MM-TT hh:mm:ss`)."
+            "description": "Zeitpunkt der Absendung beim Fremdsystem: ISO 8601 mit Zone (etwa\n`2026-11-28T09:41:12Z`) oder UTC als `JJJJ-MM-TT hh:mm:ss`, Jahr 2000 bis 2100. Gespeichert\nwird er als UTC `JJJJ-MM-TT hh:mm:ss`.",
+            "example": "2026-11-28T09:41:12Z"
           },
           "source": {
             "oneOf": [

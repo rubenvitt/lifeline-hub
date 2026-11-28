@@ -41,7 +41,10 @@ pub struct ReportSuggestionRequest {
     /// Kennung des Vorschlags im Fremdsystem (Pflicht, höchstens 128 Zeichen). Dieselbe Kennung
     /// am selben Zugang ergibt denselben Vorschlag (Wiederholung).
     pub external_id: Option<String>,
-    /// Zeitpunkt der Absendung beim Fremdsystem (UTC, `JJJJ-MM-TT hh:mm:ss`).
+    /// Zeitpunkt der Absendung beim Fremdsystem: ISO 8601 mit Zone (etwa
+    /// `2026-11-28T09:41:12Z`) oder UTC als `JJJJ-MM-TT hh:mm:ss`, Jahr 2000 bis 2100. Gespeichert
+    /// wird er als UTC `JJJJ-MM-TT hh:mm:ss`.
+    #[schema(example = "2026-11-28T09:41:12Z")]
     pub sent_at: Option<String>,
     pub source: Option<ReportSuggestionSource>,
 }
@@ -72,6 +75,22 @@ fn is_adapter(s: &str) -> bool {
     (1..=ADAPTER_MAX).contains(&s.len())
         && s.bytes()
             .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-' || b == b'_')
+}
+
+/// `sent_at` normalisiert (ISO 8601 mit Zone wie `2026-11-28T09:41:12Z` oder UTC
+/// `JJJJ-MM-TT hh:mm:ss`), nur mit einem Jahr aus `zeit::JAHRE`: Knoten ohne Uhr senden oft
+/// Epoch 0, das Formular belegte sonst die Ereigniszeit mit 1970 vor (Review M2).
+fn pruefe_sent_at(roh: &str) -> Result<String, ApiError> {
+    let ungueltig = || {
+        unprocessable(format!(
+            "sent_at muss ein Zeitpunkt nach ISO 8601 (etwa 2026-11-28T09:41:12Z) zwischen den \
+             Jahren {} und {} sein",
+            crate::zeit::JAHRE.start(),
+            crate::zeit::JAHRE.end()
+        ))
+    };
+    let normal = crate::etb::normalisiere_zeit(roh.trim()).map_err(|_| ungueltig())?;
+    crate::zeit::im_jahresbereich(normal, "sent_at").map_err(|_| ungueltig())
 }
 
 fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
@@ -134,17 +153,7 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
     let Some(signiert) = source.signed else {
         return Err(unprocessable("source.signed ist Pflicht"));
     };
-    let gesendet_at = match roh.sent_at {
-        None => None,
-        Some(s) => {
-            if chrono::NaiveDateTime::parse_from_str(&s, "%Y-%m-%d %H:%M:%S").is_err() {
-                return Err(unprocessable(
-                    "sent_at muss das Format JJJJ-MM-TT hh:mm:ss (UTC) haben",
-                ));
-            }
-            Some(s)
-        }
-    };
+    let gesendet_at = roh.sent_at.as_deref().map(pruefe_sent_at).transpose()?;
     Ok(Geprueft {
         text: text.to_string(),
         external_id,
@@ -178,7 +187,7 @@ fn pruefen(body: &[u8]) -> Result<Geprueft, ApiError> {
         (status = 403, description = "Dem Zugang fehlt das Recht `meldungen:write`", body = super::ApiErrorBody),
         (status = 409, description = "`incident_not_released`: für den Zugang ist kein Einsatz freigegeben, oder das Modul Meldungen ist im freigegebenen Einsatz ausgeblendet (die Brücke puffert und versucht es später); `fuehrung_elsewhere`: eine andere Instanz führt den freigegebenen Einsatz", body = super::ApiErrorBody),
         (status = 413, description = "Der Body ist größer als 64 KiB", body = super::ApiErrorBody),
-        (status = 422, description = "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`", body = super::ApiErrorBody),
+        (status = 422, description = "Ein Feld fehlt oder ist ungültig: leerer oder zu langer `text`, fehlende `external_id`, `source.adapter` außerhalb von `[a-z0-9_-]{1,32}`, fehlende `source.sender_id` oder `source.signed`, `sent_at` nicht lesbar oder außerhalb der Jahre 2000 bis 2100", body = super::ApiErrorBody),
         (status = 429, description = "Gedrosselt; `Retry-After` nennt die Wartezeit", body = super::ApiErrorBody),
         (status = "default", description = "Fehler mit stabilem `code`", body = super::ApiErrorBody),
     ),

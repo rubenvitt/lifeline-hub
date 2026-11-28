@@ -302,3 +302,50 @@ async fn eine_freigabe_auf_einen_fremden_einsatz_legt_nichts_ab() {
     assert_eq!(v["code"], "incident_not_released");
     assert_eq!(zaehle(&pool, "meldung_vorschlag", einsatz).await, 0);
 }
+
+/// Review M2: `sent_at` nimmt ISO 8601 wie im Beispiel des Designs (`T…Z`, auch mit Versatz),
+/// speichert ihn normalisiert und lehnt unplausible Jahre ab (Knoten ohne Uhr senden Epoch 0).
+#[tokio::test]
+async fn sent_at_wird_normalisiert_und_auf_plausibilitaet_geprueft() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["meldungen:write"]), &schluessel(1), IP).await;
+    freigeben(&pool, &cred, einsatz).await;
+
+    for (i, (roh, erwartet)) in [
+        ("2026-11-28T09:41:12Z", "2026-11-28 09:41:12"),
+        ("2026-11-28T10:41:12+01:00", "2026-11-28 09:41:12"),
+        ("2026-11-28 09:41:12", "2026-11-28 09:41:12"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut body = koerper(&format!("t-{i}"));
+        body["sent_at"] = json!(roh);
+        let (s, _, v) = einreichen(&app, &cred, &body).await;
+        assert_eq!(s, StatusCode::CREATED, "{roh} -> {v}");
+        let gespeichert: String =
+            sqlx::query_scalar("SELECT gesendet_at FROM meldung_vorschlag WHERE id = ?")
+                .bind(v["id"].as_i64().unwrap())
+                .fetch_one(&pool)
+                .await
+                .unwrap();
+        assert_eq!(gespeichert, erwartet, "{roh}");
+    }
+    for (i, roh) in [
+        "1970-01-01 00:00:00",
+        "1970-01-01T00:00:00Z",
+        "2101-01-01T00:00:00Z",
+        "morgen",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let mut body = koerper(&format!("f-{i}"));
+        body["sent_at"] = json!(roh);
+        let (s, _, v) = einreichen(&app, &cred, &body).await;
+        assert_eq!(s, StatusCode::UNPROCESSABLE_ENTITY, "{roh} -> {v}");
+        assert_eq!(v["code"], "unprocessable");
+    }
+}
