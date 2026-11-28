@@ -190,6 +190,7 @@ pub async fn einreichen(
     let geprueft = pruefen(&client.body)?;
     let jetzt = crate::zeit::jetzt();
     let zugang_id = client.zugang.id.clone();
+    let org_id = client.zugang.org_id;
     let (v, neu) = crate::write_retry!(&state.pool, |conn| {
         let Some(einsatz_id) =
             super::freigabe::freigegebener_einsatz_tx(&mut *conn, &zugang_id).await?
@@ -212,6 +213,16 @@ pub async fn einreichen(
             .bind(einsatz_id)
             .fetch_one(&mut *conn)
             .await?;
+        // Gegenprobe wie `freigabe::is_lesbar` (Review M5): eine Freigabe auf einen fremden
+        // Einsatz legt den Vorschlag nicht in der fremden Org ab.
+        if einsatz_org != org_id {
+            tracing::error!(
+                zugang_id,
+                einsatz_id,
+                "Freigabe zeigt auf einen Einsatz einer anderen Organisation"
+            );
+            return Ok(Err(ApiError::from_code(ErrorCode::IncidentNotReleased)));
+        }
         // Ist „Meldungen“ ausgeblendet, sähe niemand den Vorschlag, bis er abläuft (Review I2):
         // ablehnen, damit die Brücke puffert.
         if crate::einsatz::berechtigung::is_modul_ausgeblendet_tx(

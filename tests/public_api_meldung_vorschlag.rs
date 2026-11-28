@@ -279,3 +279,26 @@ async fn bei_ausgeblendetem_modul_meldungen_lehnt_die_route_ab() {
     let (s, _, v) = einreichen(&app, &cred, &koerper("a-1")).await;
     assert_eq!(s, StatusCode::CREATED, "{v}");
 }
+
+/// Review M5: Eine fehlerhafte Freigabezeile auf den Einsatz einer anderen Organisation legt
+/// keinen Vorschlag dort ab (Gegenprobe wie beim Lesen).
+#[tokio::test]
+async fn eine_freigabe_auf_einen_fremden_einsatz_legt_nichts_ab() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen_mit(&app, &admin, "Stadtfest").await;
+    let cred = angebunden(&app, &admin, json!(["meldungen:write"]), &schluessel(1), IP).await;
+    let (fremde_org, _) =
+        common::fremde_org_anlegen(&pool, "Fremd", "fritz", "fritzpw12", "keine").await;
+    freigeben(&pool, &cred, einsatz).await;
+    sqlx::query("UPDATE maschinenzugang SET org_id = ? WHERE id = ?")
+        .bind(fremde_org)
+        .bind(&cred.zugang_id)
+        .execute(&pool)
+        .await
+        .unwrap();
+    let (s, _, v) = einreichen(&app, &cred, &koerper("a-1")).await;
+    assert_eq!(s, StatusCode::CONFLICT, "{v}");
+    assert_eq!(v["code"], "incident_not_released");
+    assert_eq!(zaehle(&pool, "meldung_vorschlag", einsatz).await, 0);
+}
