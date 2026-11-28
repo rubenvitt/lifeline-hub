@@ -354,12 +354,30 @@ fn normalize_email_lehnt_mehrere_und_anzeigenamen_ab() {
 }
 
 #[test]
-fn email_fax_und_matrix_sind_freigeschaltet_threema_nicht() {
+fn alle_vier_kanaele_sind_freigeschaltet() {
     use super::KanalArt;
-    assert!(KanalArt::Email.is_freigeschaltet());
-    assert!(KanalArt::Fax.is_freigeschaltet());
-    assert!(KanalArt::Matrix.is_freigeschaltet());
-    assert!(!KanalArt::Threema.is_freigeschaltet());
+    for k in [KanalArt::Email, KanalArt::Fax, KanalArt::Matrix, KanalArt::Threema] {
+        assert!(k.is_freigeschaltet(), "{k:?}");
+    }
+}
+
+#[test]
+fn threema_id_wird_normalisiert() {
+    use super::kanal::normalize_threema;
+    assert_eq!(normalize_threema("echoecho").unwrap(), "ECHOECHO");
+    assert_eq!(normalize_threema(" ECHO ECHO ").unwrap(), "ECHOECHO");
+    assert_eq!(normalize_threema("*ABCDEF1").unwrap(), "*ABCDEF1");
+}
+
+#[test]
+fn threema_id_wird_abgelehnt() {
+    use super::kanal::normalize_threema;
+    assert!(normalize_threema("").is_err());
+    assert!(normalize_threema("   ").is_err());
+    for roh in ["ECHOECH", "ECHOECHO1", "ECHO-ECH", "ECHÖECHO", "AB*CDEFG"] {
+        let e = normalize_threema(roh).expect_err(roh);
+        assert!(e.contains("acht Zeichen"), "{roh}: {e}");
+    }
 }
 
 #[test]
