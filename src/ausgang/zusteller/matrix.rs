@@ -570,10 +570,7 @@ mod tests {
                 pruefung_vorziehen: true
             }
         );
-        assert_eq!(
-            beim_senden(M::Verboten),
-            M::SendenVerweigert(403)
-        );
+        assert_eq!(beim_senden(M::Verboten), M::SendenVerweigert(403));
         assert_eq!(beim_senden(M::NichtGefunden), M::SendenVerweigert(404));
         assert_eq!(beim_senden(M::Netz), M::Netz);
         assert_eq!(art(M::ZuGross), Zustellfehler::ZuGross);
