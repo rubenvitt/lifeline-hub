@@ -90,6 +90,21 @@ describe('Modul-Zähler', () => {
     });
   });
 
+  // Review M8: Ein vor dem Update gespeicherter Stand (Lagebild offline) kennt das Feld nicht.
+  it('zählt einen alten Stand ohne vorschlaege_offen ohne NaN', () => {
+    const alt = {
+      offen: 2,
+      ungesehen: 1,
+      bestaetigung_ueberfaellig: 0,
+      sofort_offen: 0,
+      dringend_offen: 0,
+    } as unknown as Parameters<typeof bildeZaehler>[0]['meldungen'];
+    expect(bildeZaehler({ meldungen: alt }).meldungen).toEqual({
+      wert: 2,
+      beschreibung: '2 offene Meldungen, davon 1 ungesehen',
+    });
+  });
+
   it('bildet die neuen Lagemeldungen ab', () => {
     expect(bildeZaehler({ lagemeldungen: { neu: 2 } })).toEqual({
       lagemeldungen: { wert: 2, beschreibung: '2 neue Lagemeldungen' },

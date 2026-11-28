@@ -60,14 +60,18 @@ const ABBILDUNG: { [Q in ServerZaehlerQuelle]: (z: Antwort<Q>) => ModulZaehlerWe
   }),
   // Offene Vorschläge des Maschinen-Eingangs (LLH-2112) warten wie offene Meldungen; der Zähler im
   // Menü nennt beide, die Zahl `offen` selbst bleibt die der Meldungen (Überblick, Vorbereitung).
-  meldungen: ({ offen, ungesehen, vorschlaege_offen }) => ({
-    wert: offen + vorschlaege_offen,
-    beschreibung:
-      `${anzahl(offen, 'offene Meldung', 'offene Meldungen')}, davon ${anzahl(ungesehen, 'ungesehen', 'ungesehen')}` +
-      (vorschlaege_offen > 0
-        ? `, und ${anzahl(vorschlaege_offen, 'offener Vorschlag', 'offene Vorschläge')}`
-        : ''),
-  }),
+  // `?? 0`: ein vor dem Update gespeicherter Stand (Lagebild offline) kennt das Feld nicht.
+  meldungen: ({ offen, ungesehen, vorschlaege_offen }) => {
+    const vorschlaege = vorschlaege_offen ?? 0;
+    return {
+      wert: offen + vorschlaege,
+      beschreibung:
+        `${anzahl(offen, 'offene Meldung', 'offene Meldungen')}, davon ${anzahl(ungesehen, 'ungesehen', 'ungesehen')}` +
+        (vorschlaege > 0
+          ? `, und ${anzahl(vorschlaege, 'offener Vorschlag', 'offene Vorschläge')}`
+          : ''),
+    };
+  },
   auftraege: ({ offen, ueberfaellig }) => ({
     wert: offen,
     beschreibung: `${anzahl(offen, 'offener Auftrag', 'offene Aufträge')}, davon ${anzahl(ueberfaellig, 'überfällig', 'überfällig')}`,
