@@ -8,6 +8,9 @@
 //!   `contains_key` — `v["x"] == Null` unterscheidet „fehlt" nicht von `null`.
 
 use axum::http::StatusCode;
+use lifeline_hub::meldung::vorschlag::{einreichen_tx, Herkunft, NeuerVorschlag};
+use lifeline_hub::public_api::scope::Scope;
+use lifeline_hub::public_api::zugang;
 use serde_json::{json, Value};
 
 mod common;
@@ -240,7 +243,7 @@ async fn kommunikationszaehler_entsprechen_den_listen() {
         v["meldungen"],
         json!({
             "offen": offen, "ungesehen": neu, "bestaetigung_ueberfaellig": 0,
-            "sofort_offen": 0, "dringend_offen": 0
+            "sofort_offen": 0, "dringend_offen": 0, "vorschlaege_offen": 0
         }),
         "{v:?}"
     );
@@ -859,7 +862,7 @@ async fn erlaubtes_leeres_modul_steht_auf_null() {
         v["meldungen"],
         json!({
             "offen": 0, "ungesehen": 0, "bestaetigung_ueberfaellig": 0,
-            "sofort_offen": 0, "dringend_offen": 0
+            "sofort_offen": 0, "dringend_offen": 0, "vorschlaege_offen": 0
         }),
         "{v:?}"
     );
@@ -1068,4 +1071,74 @@ async fn aufgeloeste_einheit_zaehlt_nicht() {
     assert_eq!(v["einheiten"]["gesamt"].as_i64(), Some(1), "{v:?}");
     let liste = get(&app, &admin, &format!("{basis}/units")).await;
     assert_eq!(liste.as_array().unwrap().len(), 1, "{liste:?}");
+}
+
+/// Offene Meldungsvorschläge maschineller Zugänge zählen im Meldungszähler als eigene Zahl, damit
+/// sie nicht übersehen werden; abgelaufene und verworfene zählen nicht, „offen“ bleibt unberührt.
+#[tokio::test]
+async fn offene_vorschlaege_zaehlen_im_meldungszaehler() {
+    let (app, pool) = setup_mit_pool().await;
+    let admin = login_cookie(&app, "admin", "startpw12").await;
+    let einsatz = einsatz_anlegen(&app, &admin).await;
+    let org: i64 = sqlx::query_scalar("SELECT org_id FROM einsatz WHERE id = ?")
+        .bind(einsatz)
+        .fetch_one(&pool)
+        .await
+        .unwrap();
+    let jetzt = lifeline_hub::zeit::jetzt();
+    let mut c = pool.acquire().await.unwrap();
+    let zugang_id = zugang::anlegen(
+        &mut c,
+        org,
+        "Funk-Gateway",
+        &[Scope::MeldungenWrite],
+        None,
+        None,
+        &jetzt,
+    )
+    .await
+    .unwrap();
+    let herkunft = Herkunft {
+        adapter: "funk-gateway".into(),
+        kennung: "unit-7".into(),
+        name: None,
+        signiert: true,
+    };
+    let mut ids = vec![];
+    for ext in ["a", "b", "c", "d"] {
+        let (v, neu) = einreichen_tx(
+            &mut c,
+            &NeuerVorschlag {
+                einsatz_id: einsatz,
+                zugang_id: &zugang_id,
+                external_id: ext,
+                text: "Text",
+                herkunft: &herkunft,
+                gesendet_at: None,
+                empfangen_at: &jetzt,
+            },
+            &jetzt,
+        )
+        .await
+        .unwrap();
+        assert!(neu);
+        ids.push(v.id);
+    }
+    drop(c);
+    // c: abgelaufen (älter als 12 Stunden), d: verworfen.
+    sqlx::query("UPDATE meldung_vorschlag SET empfangen_at = datetime(empfangen_at, '-13 hours') WHERE id = ?")
+        .bind(ids[2])
+        .execute(&pool)
+        .await
+        .unwrap();
+    sqlx::query("UPDATE meldung_vorschlag SET status = 'verworfen', erledigt_at = ? WHERE id = ?")
+        .bind(&jetzt)
+        .bind(ids[3])
+        .execute(&pool)
+        .await
+        .unwrap();
+
+    let v = zaehler(&app, &admin, einsatz).await;
+    assert_eq!(v["meldungen"]["vorschlaege_offen"], json!(2), "{v}");
+    assert_eq!(v["meldungen"]["offen"], json!(0), "{v}");
 }

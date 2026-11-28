@@ -248,6 +248,7 @@ pub async fn zaehlen(
         gruppen.into_iter().map(|(m, n, _)| (m, n)),
     );
     z.sofort_aelteste_at = sofort_aelteste_at;
+    z.vorschlaege_offen = crate::meldung::vorschlag::zaehle_offene(pool, einsatz_id, jetzt).await?;
     Ok(z)
 }
 

@@ -6614,6 +6614,13 @@ export interface components {
             sofort_offen: number;
             /** Format: int64 */
             ungesehen: number;
+            /**
+             * Format: int64
+             * @description Offene, nicht abgelaufene Meldungsvorschläge maschineller Zugänge (`meldung_vorschlag`):
+             *     noch keine Meldungen, deshalb nicht in „offen“, aber sichtbar, damit sie nicht übersehen
+             *     werden. Die reine Zählregel kennt sie nicht (0); `meldung::repo::zaehlen` setzt sie.
+             */
+            vorschlaege_offen: number;
         };
         /**
          * @description Meldungsart (Schema-Anker für die OpenAPI-Union, LFH-120). Wire == `meldungsart`.

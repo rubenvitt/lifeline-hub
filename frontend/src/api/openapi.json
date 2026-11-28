@@ -16435,7 +16435,8 @@
           "ungesehen",
           "bestaetigung_ueberfaellig",
           "sofort_offen",
-          "dringend_offen"
+          "dringend_offen",
+          "vorschlaege_offen"
         ],
         "properties": {
           "bestaetigung_ueberfaellig": {
@@ -16467,6 +16468,11 @@
           "ungesehen": {
             "type": "integer",
             "format": "int64"
+          },
+          "vorschlaege_offen": {
+            "type": "integer",
+            "format": "int64",
+            "description": "Offene, nicht abgelaufene Meldungsvorschläge maschineller Zugänge (`meldung_vorschlag`):\nnoch keine Meldungen, deshalb nicht in „offen“, aber sichtbar, damit sie nicht übersehen\nwerden. Die reine Zählregel kennt sie nicht (0); `meldung::repo::zaehlen` setzt sie."
           }
         }
       },

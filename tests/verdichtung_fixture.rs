@@ -145,6 +145,7 @@ fn meldungen_zaehlen_wie_das_fixture() {
             sofort_offen: zahl(&e["sofort_offen"]),
             dringend_offen: zahl(&e["dringend_offen"]),
             sofort_aelteste_at: None,
+            vorschlaege_offen: 0,
         }
     );
 }

@@ -28,6 +28,7 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
         bestaetigung_ueberfaellig: 2,
         sofort_offen: 0,
         dringend_offen: 0,
+        vorschlaege_offen: 0,
       },
     });
     expect(auftragsStand(q)).toEqual({
@@ -42,6 +43,7 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
         bestaetigung_ueberfaellig: 2,
         sofort_offen: 0,
         dringend_offen: 0,
+        vorschlaege_offen: 0,
       },
     });
   });
@@ -93,6 +95,7 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
         bestaetigung_ueberfaellig: 0,
         sofort_offen: 0,
         dringend_offen: 0,
+        vorschlaege_offen: 0,
       }),
     ).toBe('1 neu');
     expect(
@@ -102,6 +105,7 @@ describe('Handlungsmengen aus dem Modulzähler (LFH-550)', () => {
         bestaetigung_ueberfaellig: 2,
         sofort_offen: 0,
         dringend_offen: 0,
+        vorschlaege_offen: 0,
       }),
     ).toBe('0 neu · 2 Bestätigung überfällig');
   });

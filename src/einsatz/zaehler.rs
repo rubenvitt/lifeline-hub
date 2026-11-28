@@ -62,6 +62,10 @@ pub struct MeldungsZaehler {
     /// Die reine Zählregel kennt keine Zeiten; `meldung::repo::zaehlen` setzt es.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub sofort_aelteste_at: Option<String>,
+    /// Offene, nicht abgelaufene Meldungsvorschläge maschineller Zugänge (`meldung_vorschlag`):
+    /// noch keine Meldungen, deshalb nicht in „offen“, aber sichtbar, damit sie nicht übersehen
+    /// werden. Die reine Zählregel kennt sie nicht (0); `meldung::repo::zaehlen` setzt sie.
+    pub vorschlaege_offen: i64,
 }
 
 /// Aufträge: offen (offen/in Arbeit), davon in Arbeit, davon überfällig.
@@ -195,6 +199,7 @@ pub fn zaehle_meldungen_gewichtet(
         sofort_offen: 0,
         dringend_offen: 0,
         sofort_aelteste_at: None,
+        vorschlaege_offen: 0,
     };
     for (m, n) in gruppen {
         if m.ist_sofort_offen() {
@@ -472,6 +477,7 @@ mod tests {
                 sofort_offen: 0,
                 dringend_offen: 0,
                 sofort_aelteste_at: None,
+                vorschlaege_offen: 0,
             }),
             auftraege: Some(AuftragsZaehler {
                 offen: 1,

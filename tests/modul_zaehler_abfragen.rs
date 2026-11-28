@@ -129,9 +129,9 @@ async fn zaehlerabruf_kostet_bei_grossem_bestand_nicht_mehr_abfragen() {
         .unwrap();
     let basis = format!("/api/incidents/{einsatz}");
 
-    // Elf Module, je genau eine Abfrage. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
+    // Elf Module, je genau eine Abfrage, dazu die Zählung offener Meldungsvorschläge. Die feste Zahl belegt auch, dass überhaupt gezählt wird.
     let leer = statements_von_berechne(&pool, einsatz, &admin).await.len();
-    assert_eq!(leer, 11, "leerer Einsatz: {leer} Statements");
+    assert_eq!(leer, 12, "leerer Einsatz: {leer} Statements");
 
     // Bestand: Aufträge mit je drei Empfängern (der frühere Listenpfad lud sie mit), Meldungen,
     // Erinnerungen und Chat-Nachrichten eines anderen Benutzers.

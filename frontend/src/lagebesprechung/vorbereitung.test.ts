@@ -88,6 +88,7 @@ function quellen(over: Partial<VorbereitungsQuellen> = {}): VorbereitungsQuellen
         bestaetigung_ueberfaellig: 0,
         sofort_offen: 0,
         dringend_offen: 0,
+        vorschlaege_offen: 0,
       },
     },
     nachforderungen: {
