@@ -222,6 +222,74 @@ describe('SendenDialog (LLH-2093)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect((await screen.findAllByText('Kein Mailserver eingerichtet')).length).toBeGreaterThan(0);
     expect(matrix).toBeEnabled();
+    // Gesperrt sind die Mailadressen, nicht die Matrix-Adresse (LLH-2147).
+    await waitFor(() =>
+      expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeDisabled(),
+    );
+  });
+
+  it('sperrt_ohne_mailserver_die_mailadressen_mit_grund_und_waehlt_die_matrix_adresse_nach', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+      kanal(41, 'THW OV', 'thw@example.org'),
+      kanal(42, 'THW OV', '#thw:example.org', 'matrix', 41),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Mailserver eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    const ilsMatrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(ilsMatrix).toBeChecked());
+    const thwMail = screen.getByRole('checkbox', { name: /thw@example\.org/ });
+    await userEvent.click(thwMail);
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+
+    await waitFor(() => expect(thwMail).toBeDisabled());
+    expect(thwMail).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeDisabled();
+    // Der Grund steht an der gesperrten Adresse.
+    const thw = screen.getByRole('group', { name: 'THW OV' });
+    expect(within(thw).getByText(/Kein Mailserver eingerichtet/)).toBeInTheDocument();
+    // Die Matrix-Adresse derselben Stelle ersetzt die Mailadresse; die Matrix bleibt frei.
+    expect(screen.getByRole('checkbox', { name: /#thw:example\.org/ })).toBeChecked();
+    expect(ilsMatrix).toBeChecked();
+    expect(ilsMatrix).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Senden' })).toBeEnabled();
+  });
+
+  it('sperrt_ohne_faxzugang_die_faxnummern_ohne_ersatz', async () => {
+    kanaele([
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+      kanal(51, 'Kreis', '+49511123456', 'fax'),
+      kanal(52, 'Kreis', 'kreis@example.org', 'email', 51),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          { error: 'Kein Faxzugang eingerichtet', grund: 'anbindung_fehlt' },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige();
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    const fax = screen.getByRole('checkbox', { name: /\+49511123456/ });
+    await userEvent.click(fax);
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+
+    await waitFor(() => expect(fax).toBeDisabled());
+    expect(fax).not.toBeChecked();
+    // Eine Faxnummer wählt man bewusst; nichts wird an ihrer Stelle angehakt.
+    expect(screen.getByRole('checkbox', { name: /kreis@example\.org/ })).not.toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /kreis@example\.org/ })).toBeEnabled();
+    expect(matrix).toBeChecked();
   });
 
   it('waehlt_nach_der_matrix_sperre_die_mailadresse_derselben_stelle_nach', async () => {
