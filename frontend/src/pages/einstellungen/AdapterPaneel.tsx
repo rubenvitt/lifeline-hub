@@ -245,7 +245,9 @@ export default function AdapterPaneel() {
                       </span>
                     }
                     description={
-                      <span style={{ color: rollen.gedaempft }}>{nebenangaben(a, zeit, versand)}</span>
+                      <span style={{ color: rollen.gedaempft }}>
+                        {nebenangaben(a, zeit, versand)}
+                      </span>
                     }
                   />
                 </ListenEintrag>

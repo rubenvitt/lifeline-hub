@@ -37,7 +37,10 @@ export const SMTP_ART: AdapterArtAnzeige = {
 };
 
 /** Eine SMTP-Anbindung zu {@link SMTP_ART}. */
-export function smtpAdapterFixture(id: string, extra: Partial<AdapterAnzeige> = {}): AdapterAnzeige {
+export function smtpAdapterFixture(
+  id: string,
+  extra: Partial<AdapterAnzeige> = {},
+): AdapterAnzeige {
   return adapterFixture(id, {
     art: 'smtp',
     art_bezeichnung: 'E-Mail (SMTP)',
@@ -45,7 +48,13 @@ export function smtpAdapterFixture(id: string, extra: Partial<AdapterAnzeige> = 
     intervall_s: 3600,
     letzte_anzahl: 0,
     geheimnisse: [
-      { name: 'passwort', bezeichnung: 'Passwort', pflicht: false, is_gesetzt: true, is_unlesbar: false },
+      {
+        name: 'passwort',
+        bezeichnung: 'Passwort',
+        pflicht: false,
+        is_gesetzt: true,
+        is_unlesbar: false,
+      },
     ],
     ...extra,
   });

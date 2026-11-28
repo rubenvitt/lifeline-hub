@@ -265,7 +265,9 @@ describe('AdapterPaneel', () => {
   });
 
   it('legt eine Versand-Anbindung ohne Intervall an und zeigt es bei einer Abruf-Art wieder', async () => {
-    const aufrufe = stelleBereit(adapterListeFixture({ adapter: [], arten: [SMTP_ART, BEISPIEL_ART] }));
+    const aufrufe = stelleBereit(
+      adapterListeFixture({ adapter: [], arten: [SMTP_ART, BEISPIEL_ART] }),
+    );
     const user = userEvent.setup();
     rendere();
     await user.click(await screen.findByRole('button', { name: 'Adapter anlegen' }));
