@@ -28,6 +28,7 @@ import { pflicht } from '../../components/pflichtRegel';
 import { useAuth } from '../../auth/AuthContext';
 import { useAnzeigeKonventionen } from '../../anzeige/AnzeigeKonventionenContext';
 import { zeitKurz } from '../../anzeige/zeitDarstellung';
+import { zahlText } from '../../anzeige/zahl';
 import { ApiError, isVeraltet } from '../../api/client';
 import {
   SOFORT_ODER_NIE,
@@ -69,6 +70,9 @@ const STAMMDATEN_ABRUF = 'stammdaten_abruf';
 
 /** Art „Matrix“ (LLH-2094): Konto des Ausgangs; trägt den Hinweis zur Verifizierung. */
 const MATRIX = 'matrix';
+
+/** Art „Threema Gateway“ (LLH-2096): die Prüfung liefert das Guthaben als Anzahl. */
+const THREEMA = 'threema';
 
 /** Formularwerte: Name, Intervall und je Einstellungsfeld `e_<name>` (flach für das Paneel). */
 type Werte = Record<string, unknown> & { name: string; intervall_s: number };
@@ -412,6 +416,9 @@ export default function AdapterAnsicht() {
             </span>
           </Paneel>
         )}
+        {adapter.art === THREEMA && (
+          <ThreemaGuthaben guthaben={pruefErgebnis?.anzahl ?? adapter.letzte_anzahl} />
+        )}
         <Paneel
           titel="Zustand"
           fuss={
@@ -711,6 +718,29 @@ function Verlauf({
           </PaneelZeile>
         ))
       )}
+    </Paneel>
+  );
+}
+
+/**
+ * Das Guthaben eines Threema-Gateways (LLH-2096): die Anzahl der letzten Prüfung von Hand oder
+ * des letzten Laufs. Bei 0 scheitert jeder Versand; der Hinweis sagt es vorher.
+ */
+function ThreemaGuthaben({ guthaben }: { guthaben: number | null | undefined }) {
+  return (
+    <Paneel titel="Guthaben" koerperPolster>
+      <span data-lfh="adapter-threema-guthaben">
+        <Stapel abstand="xxs">
+          <span style={monoStil('mono')}>
+            {guthaben == null ? 'noch nicht geprüft' : `${zahlText(guthaben)} Credits`}
+          </span>
+          {guthaben === 0 && (
+            <Textstufe stufe="textKlein" ton="alarm">
+              Kein Guthaben: jeder Versand scheitert, bis Credits nachgekauft sind.
+            </Textstufe>
+          )}
+        </Stapel>
+      </span>
     </Paneel>
   );
 }

@@ -7,9 +7,10 @@ import { useKanaeleSammlung } from '../api/externeStellen';
 import {
   ANBINDUNG_GRUENDE,
   AUSGANG_FEHLER_TEXT,
-  anbindungKanal,
+  anbindungKanaele,
   useSendeVersaende,
   versandFehler,
+  type AusgangKanal,
   type QuelleFilter,
 } from '../api/ausgang';
 import type { AusgangFehler, KanalArt, KanalMitStelle } from '../api/types';
@@ -27,6 +28,9 @@ interface FormWerte {
 }
 
 const VORSCHAU_ZEILEN = 3;
+
+/** Rangfolge, in der je Stelle eine Adresse für eine gesperrte nachrückt; Fax nie. */
+const RUECKFALL: readonly KanalArt[] = ['matrix', 'threema', 'email'];
 
 function groesse(bytes: number): string {
   return bytes >= 1024 * 1024
@@ -52,11 +56,12 @@ function nachStelle(kanaele: readonly KanalMitStelle[]): KanalMitStelle[][] {
 }
 
 /**
- * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail, Fax oder
- * Matrix (LLH-2093, LLH-2095, LLH-2094, Spec 7 und 8): Adressen der aktiven Externen Stellen zum
+ * Senden eines freigegebenen Lageberichts, Befehls oder einer Nachforderung per E-Mail, Fax,
+ * Matrix oder Threema (LLH-2093, LLH-2095, LLH-2094, LLH-2096): Adressen der aktiven Externen Stellen zum
  * Anhaken, je Stelle beisammen unter ihrem Namen (Kanal als Wort davor), die Stellen des Verteilers bzw. der Adressat sind mit je einer
  * Adresse vorbelegt, nie mit einer Faxnummer, damit eine Stelle nicht doppelt Post bekommt. Fehlt
- * das Matrix-Konto, sind nur die Matrix-Adressen gesperrt. Nur online; ein Versand wird nie
+ * die Anbindung von Matrix oder Threema, sind nur deren Adressen gesperrt, und je Stelle rückt die
+ * nächste Adresse nach (Matrix, Threema, Mail). Nur online; ein Versand wird nie
  * vorgemerkt.
  */
 export default function SendenDialog({
@@ -89,19 +94,12 @@ export default function SendenDialog({
   const gewaehlt = Form.useWatch('kanaele', form) as number[] | undefined;
   const kanaeleQuery = useKanaeleSammlung();
   const sende = useSendeVersaende(einsatzId, quelle);
-  // Der Server kennt heute E-Mail, Fax und Matrix; ein anderer Kanal bleibt aus der Auswahl.
-  const kanaele = useMemo(
-    () =>
-      kanaeleQuery.data?.filter(
-        (k) =>
-          k.channel.channel === 'email' ||
-          k.channel.channel === 'fax' ||
-          k.channel.channel === 'matrix',
-      ),
-    [kanaeleQuery.data],
-  );
-  /** Grund, warum die Matrix-Adressen gesperrt sind, nachdem der Server das Konto abgelehnt hat. */
-  const [matrixGesperrt, setMatrixGesperrt] = useState<string | null>(null);
+  const kanaele = kanaeleQuery.data;
+  /**
+   * Gründe je Kanal, warum seine Adressen gesperrt sind, nachdem der Server die Anbindung
+   * abgelehnt hat (nur Matrix und Threema; ohne Mailserver geht ohnehin nichts).
+   */
+  const [sperren, setSperren] = useState<Partial<Record<AusgangKanal, string>>>({});
   /** Kanäle der zuletzt gesendeten Adressen: nach ihnen richtet sich der Wortlaut einer Ablehnung. */
   const [gesendet, setGesendet] = useState<KanalArt[]>([]);
 
@@ -116,7 +114,7 @@ export default function SendenDialog({
   useEffect(() => {
     if (!offen || !kanaele || vorbelegtFuer.current === clientId) return;
     vorbelegtFuer.current = clientId;
-    setMatrixGesperrt(null);
+    setSperren({});
     form.setFieldValue('kanaele', [...empfaengerVorschlag(kanaele, vorschlagNamen)]);
   }, [offen, kanaele, clientId, form, vorschlagNamen]);
 
@@ -134,34 +132,41 @@ export default function SendenDialog({
     !!sende.error.grund &&
     ANBINDUNG_GRUENDE.has(sende.error.grund);
 
-  /** Eine Ablehnung wegen des Matrix-Kontos sperrt die Matrix-Adressen, nicht den Dialog. */
-  const merkeMatrixSperre = (e: unknown, arten: readonly KanalArt[]) => {
-    if (
-      e instanceof ApiError &&
-      e.grund &&
-      ANBINDUNG_GRUENDE.has(e.grund) &&
-      anbindungKanal(e, arten) === 'matrix'
-    ) {
-      setMatrixGesperrt(AUSGANG_FEHLER_TEXT.matrix[e.grund as AusgangFehler]);
-      const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);
-      const gewaehlteIds = (form.getFieldValue('kanaele') as number[] | undefined) ?? [];
-      const rest = gewaehlteIds.filter((id) => kanalVon(id)?.channel.channel !== 'matrix');
-      // Betroffene Stellen: die erste Mailadresse derselben Stelle ersetzt die Matrix-Adresse.
-      const betroffen = new Set(
-        gewaehlteIds
-          .filter((id) => kanalVon(id)?.channel.channel === 'matrix')
-          .map((id) => kanalVon(id)?.agency_id),
-      );
-      for (const stelleId of betroffen) {
-        const stelleMails = (kanaele ?? []).filter(
-          (k) => k.agency_id === stelleId && k.channel.channel === 'email',
-        );
-        if (stelleMails.length > 0 && !stelleMails.some((k) => rest.includes(k.channel.id))) {
-          rest.push(stelleMails[0].channel.id);
-        }
+  /**
+   * Eine Ablehnung wegen der Anbindung von Matrix oder Threema sperrt deren Adressen, nicht den
+   * Dialog; je betroffener Stelle rückt die nächste freie Adresse nach (Matrix, Threema, Mail).
+   */
+  const merkeSperren = (e: unknown, arten: readonly KanalArt[]) => {
+    if (!(e instanceof ApiError) || !e.grund || !ANBINDUNG_GRUENDE.has(e.grund)) return;
+    const neu = anbindungKanaele(e, arten).filter(
+      (k): k is 'matrix' | 'threema' => k === 'matrix' || k === 'threema',
+    );
+    if (neu.length === 0) return;
+    const alle = { ...sperren };
+    for (const k of neu) alle[k] = AUSGANG_FEHLER_TEXT[k][e.grund as AusgangFehler];
+    setSperren(alle);
+    const gesperrt = (k: KanalMitStelle) => k.channel.channel in alle;
+    const kanalVon = (id: number) => kanaele?.find((k) => k.channel.id === id);
+    const gewaehlteIds = (form.getFieldValue('kanaele') as number[] | undefined) ?? [];
+    const rest = gewaehlteIds.filter((id) => {
+      const k = kanalVon(id);
+      return k !== undefined && !gesperrt(k);
+    });
+    const betroffen = new Set(
+      gewaehlteIds.flatMap((id) => {
+        const k = kanalVon(id);
+        return k && gesperrt(k) ? [k.agency_id] : [];
+      }),
+    );
+    for (const stelleId of betroffen) {
+      const ersatz = (kanaele ?? [])
+        .filter((k) => k.agency_id === stelleId && k.channel.channel !== 'fax' && !gesperrt(k))
+        .sort((a, b) => RUECKFALL.indexOf(a.channel.channel) - RUECKFALL.indexOf(b.channel.channel));
+      if (ersatz.length > 0 && !ersatz.some((k) => rest.includes(k.channel.id))) {
+        rest.push(ersatz[0].channel.id);
       }
-      form.setFieldValue('kanaele', rest);
     }
+    form.setFieldValue('kanaele', rest);
   };
 
   const vorschau = (vorschauText ?? '')
@@ -192,7 +197,7 @@ export default function SendenDialog({
             recipients: w.kanaele.map((channel_id) => ({ channel_id })),
           })
           .catch((e: unknown) => {
-            merkeMatrixSperre(e, arten);
+            merkeSperren(e, arten);
             throw e;
           });
       }}
@@ -229,12 +234,12 @@ export default function SendenDialog({
                   {gruppe[0].agency_name}
                 </Textstufe>
                 {gruppe.map((k) => {
-                  const gesperrtMatrix = k.channel.channel === 'matrix' && matrixGesperrt !== null;
+                  const sperrgrund = sperren[k.channel.channel];
                   return (
                     <Checkbox
                       key={k.channel.id}
                       value={k.channel.id}
-                      disabled={gesperrtMatrix}
+                      disabled={sperrgrund !== undefined}
                       aria-label={`${kanalKurz(k.channel.channel)} ${k.agency_name} · ${k.channel.address}`}
                     >
                       <Textstufe stufe="textKlein" ton="gedaempft">
@@ -242,10 +247,10 @@ export default function SendenDialog({
                       </Textstufe>{' '}
                       {k.channel.address}
                       {k.channel.label ? ` (${k.channel.label})` : ''}
-                      {gesperrtMatrix && (
+                      {sperrgrund !== undefined && (
                         <Typography.Text type="danger" style={schriftStil('textKlein')}>
                           {' '}
-                          · {matrixGesperrt}
+                          · {sperrgrund}
                         </Typography.Text>
                       )}
                     </Checkbox>

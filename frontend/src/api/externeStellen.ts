@@ -49,7 +49,7 @@ export function updateExterneStelle(id: number, patch: ExterneStellePatch): Prom
 // ---- Kanaladressen (LLH-2093, Fax LLH-2095) ----
 
 export interface NeuerKanal {
-  /** Der Server nimmt `email`, `fax` (LLH-2095) und `matrix` (LLH-2094) an; Threema ist noch zu. */
+  /** Der Server nimmt alle vier Kanäle an: `email`, `fax` (LLH-2095), `matrix` (LLH-2094), `threema` (LLH-2096). */
   channel: KanalArt;
   address: string;
   label?: string;

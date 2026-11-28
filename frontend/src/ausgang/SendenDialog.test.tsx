@@ -11,7 +11,7 @@ const kanal = (
   id: number,
   stelle: string,
   adresse: string,
-  art: 'email' | 'fax' | 'matrix' = 'email',
+  art: 'email' | 'fax' | 'matrix' | 'threema' = 'email',
   stelleId = id,
 ): KanalMitStelle => ({
   agency_id: stelleId,
@@ -308,5 +308,49 @@ describe('SendenDialog (LLH-2093)', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
     expect(await screen.findByText(/Das Fax hätte 45 Seiten/)).toBeInTheDocument();
     expect(screen.queryByText('Anhänge zu groß für eine Mail')).toBeNull();
+  });
+
+  it('threema_wird_angeboten', async () => {
+    kanaele([kanal(21, 'ILS Nord', 'ils@example.org'), kanal(22, 'ILS Nord', 'ECHOECHO', 'threema', 21)]);
+    zeige();
+    const threema = await screen.findByRole('checkbox', { name: /ECHOECHO/ });
+    expect(threema.closest('label')).toHaveTextContent(/^Threema\s*ECHOECHO/);
+    // Vorbelegt: Threema vor Mail.
+    await waitFor(() => expect(threema).toBeChecked());
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).not.toBeChecked();
+  });
+
+  it('matrix_und_threema_gesperrt_mail_rueckt_nach', async () => {
+    kanaele([
+      kanal(21, 'ILS Nord', 'ils@example.org'),
+      kanal(22, 'ILS Nord', '#lageraum:example.org', 'matrix', 21),
+      kanal(31, 'Kreis', 'kreis@example.org', 'email', 31),
+      kanal(32, 'Kreis', 'ECHOECHO', 'threema', 31),
+    ]);
+    server.use(
+      http.post('/api/incidents/1/situation-reports/5/deliveries', () =>
+        HttpResponse.json(
+          {
+            error: 'Kein Matrix-Konto eingerichtet; Kein Threema-Gateway eingerichtet',
+            grund: 'anbindung_fehlt',
+          },
+          { status: 422 },
+        ),
+      ),
+    );
+    zeige({ vorschlagNamen: ['ILS Nord', 'Kreis'] });
+    const matrix = await screen.findByRole('checkbox', { name: /#lageraum:example\.org/ });
+    const threema = screen.getByRole('checkbox', { name: /ECHOECHO/ });
+    await waitFor(() => expect(matrix).toBeChecked());
+    expect(threema).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: 'Senden' }));
+    await waitFor(() => expect(matrix).toBeDisabled());
+    expect(threema).toBeDisabled();
+    expect(matrix).not.toBeChecked();
+    expect(threema).not.toBeChecked();
+    // Je Stelle rückt die Mail nach.
+    expect(screen.getByRole('checkbox', { name: /ils@example\.org/ })).toBeChecked();
+    expect(screen.getByRole('checkbox', { name: /kreis@example\.org/ })).toBeChecked();
+    expect(screen.getAllByText(/Kein Threema-Gateway eingerichtet/).length).toBeGreaterThan(0);
   });
 });

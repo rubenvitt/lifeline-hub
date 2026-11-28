@@ -157,6 +157,26 @@ describe('AdapterAnsicht', () => {
     expect(aufrufe.map((a) => a.pfad)).toEqual(['pruefen']);
   });
 
+  it('threema_zeigt_guthaben', async () => {
+    stelleBereit(adapterFixture('a1', { art: 'threema', letzte_anzahl: 1234 }));
+    rendere();
+    await screen.findByText(/1\.234 Credits/);
+    expect(document.querySelector('[data-lfh="adapter-threema-guthaben"]')).toHaveTextContent(
+      /1\.234 Credits/,
+    );
+    expect(screen.queryByText(/Kein Guthaben/)).toBeNull();
+  });
+
+  it('threema_guthaben_null_zeigt_hinweis', async () => {
+    stelleBereit(adapterFixture('a1', { art: 'threema', letzte_anzahl: 0 }));
+    rendere();
+    expect(
+      await screen.findByText(
+        'Kein Guthaben: jeder Versand scheitert, bis Credits nachgekauft sind.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('hält an und setzt fort', async () => {
     const aufrufe = stelleBereit(adapterFixture('a1'));
     const user = userEvent.setup();
